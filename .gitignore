@@ -21,3 +21,7 @@ data/
 *.fdb_latexmk
 *.synctex.gz
 *.pdf
+
+
+
+.DS_Store
