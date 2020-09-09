@@ -33,17 +33,33 @@ component, formatting, style, styling, insert
 
 \section{Introduction}
 
-% Domain - What does Visual Place Recogntion entail precisely?
-% Motivation - What can it be used for?
-% Contribution of paper - What does this paper contribute?
+% What is the problem and motivation?
+Visual place recognition is the task of matching a query image of a particular location, with other images from the same location. The need for this task to be
+solved is motivated by its applications in areas such as autonomous driving, \textbf{(...)}. This task is often solved as an instance of the image retrieval
+problem, where each database image is encoded as an n-dimensional vector, and the location of query images is determined by encoding the the query image, and finding
+images close to it in the vector space. Traditionally, the images were encoded using invariant features, like SIFT, however the recent advancements in deep learning, 
+opened up for Convolutional Neural Nets (CNNs) to be used for this task as well. \\
+
+% What does this paper contribute?
+At this point it is natural to question, how we define if two images are in the same location. The majority of existing research consider two images taken in the 
+same location, if their GPS coordinates are 25 meters of each other. This definition mainly stems from the fact, that existing datasets have an uncertainly on 
+the GPS coordinates of up to 15 meters, which leaves 10 meters as a buffer. This means, that an images further away than 25 meters from a particular query image 
+will all simply be considered incorrect, regardless of how far away their true distance was. In this paper, we try to relax this condition to explore if this 
+will help improve the performance of existing SOTA frameworks. Specifically, we will present a new loss function for this task, that takes the true distances into 
+consideration.
 
 % Rest of the paper is structured as 
 
 \section{Related Work}
+\textbf{Existing Frameworks} \\
+% NetVLAD
 
-% Triplet loss 
-% Contrastive loss 
 % Fine-tuning CNN Image Retrieval with No Human Annotation
+
+\textbf{Loss Functions} \\
+% Triplet loss 
+
+% Contrastive loss 
 
 \section{Methodology}
 
