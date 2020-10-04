@@ -24,7 +24,7 @@ abho@dtu.dk}
 \maketitle
 
 \begin{abstract}
-
+% TODO: After Getting Results 
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -38,7 +38,7 @@ Visual place recognition is the task of matching a query image of a particular l
 solved is motivated by its applications in areas such as autonomous driving, \textbf{(...)}. This task is often solved as an instance of the image retrieval
 problem, where each database image is encoded as an n-dimensional vector, and the location of query images is determined by encoding the the query image, and finding
 images close to it in the vector space. Traditionally, the images were encoded using invariant features, like SIFT, however the recent advancements in deep learning, 
-opened up for Convolutional Neural Nets (CNNs) to be used for this task as well. \\
+opened up for Convolutional Neural Nets (CNNs) to be used for this task as well.
 
 % What does this paper contribute?
 At this point it is natural to question, how we define if two images are in the same location. The majority of existing research consider two images taken in the 
@@ -51,42 +51,69 @@ consideration.
 % Rest of the paper is structured as 
 
 \section{Related Work}
-\textbf{Existing Frameworks} \\
-% NetVLAD
+\textbf{Place Recognition Frameworks} 
+% Early methods using SIFT & NetVLAD - Briefly
+Traditional approaches to the place recognition task are based on exploiting local invariant features, that are aggregated into vector representation using either
+a Bag-of-Words model, VLAD or Fisher Vector. While constructing and storing these hand-crafted features can often be quite efficient, the recent advancements in 
+deep learning has led to most modern state-of-the-art models using deep features rather than hand-crafted ones. 
+
+An example of such model is NetVLAD. This model uses a standard computer vision backbone, like VGG16 or AlexNet, combined with a generalized 
+VLAD layer as its image descriptor. Training this model with a novel weakly supervised triplet ranking loss, helped them outperform non-learnt image representations,
+on several difficult place recognition benchmarks. 
 
 % Fine-tuning CNN Image Retrieval with No Human Annotation
+A more recent approach from Radenovic et. al. tries to improve on state-of-the-art techniques by exploiting different camera angles and geometries available 
+in the datasets. Their framework consists of a retrained standard CNN, such as ResNet or Alexnet, combined with a novel Generalized Mean Pooling layer. 
+This layer, based on the generalized-mean (GeM), takes a 3D tensor as input, and outpus a k-dimensional feature vector. Since GeM layer generalizes the standard 
+average pooling and max pooling, it allows the network to learn a pooling parameter, rather than it being fixed. The authors were able to show that this 
+pooling layer boosts performance over the traditional pooling layers. Combining this novel layer with hard-positive and hard-negative mining on the training data, 
+allowed the authors to achieve state-of-the-art performance on several image retrieval datasets. 
 
-\textbf{Loss Functions} \\
+\textbf{Loss Functions} 
 % Triplet loss 
+% Train on triplets (Anchor, Positive, Negative)
+One commonly used loss function in the metric learning task is Triplet Loss. The idea behind triplet loss is to group images together into triplets, where two of the 
+images match (Anchor \& Positive Sample) and one does not (Negative Sample). For the visual place recognition task, that means two images from the same place, and 
+one from a different place. For a given triplet (a, p, n), triplet loss minimizes: 
+\begin{equation}
+    L = max(D(a,p) - D(a,n) + margin, 0)
+\end{equation}
+For this to work effectively and converge fast, choosing the triplets turns out to be very important. As one might image, choosing negatives randomly will often 
+make it easy for the model to correctly classify. \textbf{(...)} 
 
 % Contrastive loss 
+Another commonly used loss function for the image-retrieval task is Contrastive loss. Here images are sampled in pairs of matching / non-matching pairs, and the loss
+is defined as:
+\begin{equation}
+    L(W, Y, X_{1}, X_{2}) = (1-Y)(D(X_{1}, X_{2}))^{2} + (Y)\frac{1}{2}\{max(0, m - D(X_{1}, X_{2}))\}^{2}
+\end{equation}
+Where $X_{1}$ and $X_{2}$ are the input vectors, and $Y = 0$ indicates that they are similar. In this way, contrastive loss forces positives to be close, and negatives to 
+be at least a certain fixed distance away. When training with contrastive loss, a common tehnique is to select positive pairs at random, and negative pairs with hard-negative mining,
+to be able to converge faster. 
 
 \section{Methodology}
 
-% TODO: Later
+% TODO: After Dataloader works
 
 \section{Experiments}
 
-% TODO: Later
+% TODO: After Dataloader works
 
 \section{Discussion}
 
-% TODO: Later
+% TODO: After Getting Results
 
 \section{Conclusion}
 
-% TODO: Later
+% TODO: After Getting Results
 
-\section*{Acknowledgment}
+\section*{Acknowledgments}
 
 % Thank you to Frederik Warbrug & Søren Hauberg
 
 \section*{References}
 
-Please number citations consecutively within brackets \cite{IEEEhowto:IEEEtranpage}. The 
-
-
-
+Please number citations consecutively within brackets \cite{IEEEhowto:IEEEtranpage}. 
 
 \bibliographystyle{./bibliography/IEEEtran}
 \bibliography{./bibliography/IEEEexample}

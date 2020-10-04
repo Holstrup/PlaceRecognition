@@ -47,14 +47,21 @@ module load cudnn/v7.0.5-prod-cuda-9.0
 module load python3/3.7.5
 
 #Create a virtual environment for Python3
-python3 -m venv training_env
+python3 -m venv hello_hpc
 
 #Activate virtual environment
-source ~/training_env/bin/activate
+source ~/hello_hpc/bin/activate
 
 echo "Installing Dependencies"
 pip3 install -r requirements.txt
 
 echo "Starting Training"
-python3 -m cirtorch.examples.train outputs
+python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'
 echo "Finished Training"
+
+#scp -r /Users/alexanderholstrup/Desktop/train_val/zurich abho@login2.hpc.dtu.dk:~/Documents/VisualPlaceRecognition/data/mapillary/train_val
+# ~/Documents/VisualPlaceRecognition/data/mapillary/train_val/zurich
+# sxm2sh
+# ~/Documents/VisualPlaceRecognition
+# python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'
+# [Errno 2] No such file or directory: 'data/mapillary/train_val/melbourne/query/postprocessed.csv'
