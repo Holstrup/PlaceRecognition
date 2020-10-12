@@ -102,6 +102,15 @@ class ImagesFromDataList(data.Dataset):
         Returns:
             image (Tensor): Loaded image
         """
+        img = [Image.open(im) for im in self.images[index].split(",")]
+        img = [self.transform(im) for im in img]
+
+        if len(img) == 1:
+            img = img[0]
+        
+        return img
+
+        """ Sfm Method
         img = self.images[index]
         if self.transform is not None:
             img = self.transform(img)
@@ -110,6 +119,7 @@ class ImagesFromDataList(data.Dataset):
             img = img.unsqueeze(0)
 
         return img
+        """
 
     def __len__(self):
         return len(self.images)
