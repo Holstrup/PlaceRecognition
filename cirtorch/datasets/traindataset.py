@@ -509,7 +509,7 @@ class TuplesDataset(data.Dataset):
             
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
-                ImagesFromList(root='foo', images=self.qidxs, imsize=self.imsize, transform=self.transform),
+                ImagesFromList(root='', images=self.qidxs, imsize=self.imsize, transform=self.transform),
                 **opt)
             
 
