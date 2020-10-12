@@ -63,7 +63,6 @@ class ImagesFromList(data.Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        print(type(img))
         return img
 
     def __len__(self):
@@ -113,7 +112,6 @@ class ImagesFromDataList(data.Dataset):
         return img
         """
         img = self.images[index]
-        print(type(img))
         if self.transform is not None:
             img = self.transform(img)
 
