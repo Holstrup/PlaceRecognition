@@ -358,7 +358,7 @@ class TuplesDataset(data.Dataset):
 
     def __calcSamplingWeights__(self):
         # length of query
-        N = len(self.qIdx)
+        N = len(self.qidxs)
 
         # initialize weights
         self.weights = np.ones(N)
