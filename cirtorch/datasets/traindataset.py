@@ -498,10 +498,7 @@ class TuplesDataset(data.Dataset):
             print('---')
             print(self.qpool[0:2])
             print('---')
-            print([i for i in self.qidxs])
-            print('---')
-            print([self.images[i] for i in self.qidxs])
-            print('---')
+            print([i for i in self.qidxs][0:10])
             
             
             # prepare query loader
@@ -512,7 +509,7 @@ class TuplesDataset(data.Dataset):
 
             
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
-            loader = torch.utils.data.DataLoader(ImagesFromList([self.qpool[i] for i in self.qidxs], transform=self.transform),**opt)
+            loader = torch.utils.data.DataLoader(ImagesFromList(self.qidxs, transform=self.transform),**opt)
 
             # extract query vectors
             qvecs = torch.zeros(net.meta['outputdim'], len(self.qidxs)).cuda()
