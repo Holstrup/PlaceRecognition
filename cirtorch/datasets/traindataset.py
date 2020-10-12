@@ -88,7 +88,7 @@ class TuplesDataset(data.Dataset):
             root_dir = 'data/mapillary' #get_data_root()
             cities = ''
             nNeg = 5
-            transform = None
+            #transform = None
             mode = 'train'
             task = 'im2im'
             subtask = 'all'
@@ -506,7 +506,7 @@ class TuplesDataset(data.Dataset):
             #    batch_size=1, shuffle=False, num_workers=8, pin_memory=True
             #)
 
-            
+            print(self.transform)
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
                 ImagesFromList(root='', images=self.qidxs, imsize=self.imsize, transform=self.transform),
