@@ -62,7 +62,11 @@ class ImagesFromList(data.Dataset):
 
         if self.transform is not None:
             img = self.transform(img)
-
+        
+        if self.root == 'foo':
+            print(type(img))
+            print(self.transform)
+        
         return img
 
     def __len__(self):
