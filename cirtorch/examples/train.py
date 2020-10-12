@@ -27,7 +27,7 @@ from cirtorch.utils.evaluate import compute_map_and_print
 from cirtorch.utils.general import get_data_root, htime
 
 training_dataset_names = ['mapillary'] #[ 'retrieval-SfM-120k']
-test_datasets_names = ['oxford5k'] #, 'paris6k', 'roxford5k', 'rparis6k']
+test_datasets_names = ['oxford5k', 'paris6k', 'roxford5k', 'rparis6k']
 test_whiten_names = ['retrieval-SfM-30k', 'retrieval-SfM-120k']
 
 model_names = sorted(name for name in models.__dict__
