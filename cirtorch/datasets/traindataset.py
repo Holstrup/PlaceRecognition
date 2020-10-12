@@ -356,28 +356,28 @@ class TuplesDataset(data.Dataset):
 
             self.print_freq = 10
 
-        def __calcSamplingWeights__(self):
-            # length of query
-            N = len(self.qIdx)
+    def __calcSamplingWeights__(self):
+        # length of query
+        N = len(self.qIdx)
 
-            # initialize weights
-            self.weights = np.ones(N)
+        # initialize weights
+        self.weights = np.ones(N)
 
-            # weight higher if from night or sideways facing
-            if len(self.night) != 0:
-                self.weights[self.night] += N / len(self.night)
-            if len(self.sideways) != 0:
-                self.weights[self.sideways] += N / len(self.sideways)
+        # weight higher if from night or sideways facing
+        if len(self.night) != 0:
+            self.weights[self.night] += N / len(self.night)
+        if len(self.sideways) != 0:
+            self.weights[self.sideways] += N / len(self.sideways)
 
-            # print weight information
-            print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
-            print("Forward and Day weighted with {:.4f}".format(1))
-            if len(self.night) != 0:
-                print("Forward and Night weighted with {:.4f}".format(1 + N/len(self.night)))
-            if len(self.sideways) != 0:
-                print("Sideways and Day weighted with {:.4f}".format( 1 + N/len(self.sideways)))
-            if len(self.sideways) != 0 and len(self.night) != 0:
-                print("Sideways and Night weighted with {:.4f}".format(1 + N/len(self.night) + N/len(self.sideways)))
+        # print weight information
+        print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
+        print("Forward and Day weighted with {:.4f}".format(1))
+        if len(self.night) != 0:
+            print("Forward and Night weighted with {:.4f}".format(1 + N/len(self.night)))
+        if len(self.sideways) != 0:
+            print("Sideways and Day weighted with {:.4f}".format( 1 + N/len(self.sideways)))
+        if len(self.sideways) != 0 and len(self.night) != 0:
+            print("Sideways and Night weighted with {:.4f}".format(1 + N/len(self.night) + N/len(self.sideways)))
 
     def filter(self, seqKeys, seqIdxs, center_frame_condition):
         keys, idxs = [], []
