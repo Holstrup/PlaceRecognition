@@ -494,11 +494,10 @@ class TuplesDataset(data.Dataset):
         with torch.no_grad():
 
             print('>> Extracting descriptors for query images...')
-            print(self.qidxs[0:2])
+            print(self.qidxs[0:2], type(self.qidxs[0]))
             print('---')
-            print(self.qpool[0:2])
+            print(self.qpool[0], type(self.qpool[0]))
             print('---')
-            print([i for i in self.qidxs][0:10])
             
             
             # prepare query loader
@@ -516,6 +515,7 @@ class TuplesDataset(data.Dataset):
             # extract query vectors
             qvecs = torch.zeros(net.meta['outputdim'], len(self.qidxs)).cuda()
             for i, input in enumerate(loader):
+                print(i, input) # <- Debug
                 qvecs[:, i] = net(input.cuda()).data.squeeze()
                 if (i+1) % self.print_freq == 0 or (i+1) == len(self.qidxs):
                     print('\r>>>> {}/{} done...'.format(i+1, len(self.qidxs)), end='')
