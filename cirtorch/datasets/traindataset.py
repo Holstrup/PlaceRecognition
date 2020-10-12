@@ -379,6 +379,14 @@ class TuplesDataset(data.Dataset):
             if len(self.sideways) != 0 and len(self.night) != 0:
                 print("Sideways and Night weighted with {:.4f}".format(1 + N/len(self.night) + N/len(self.sideways)))
 
+    def filter(self, seqKeys, seqIdxs, center_frame_condition):
+        keys, idxs = [], []
+        for key, idx in zip(seqKeys, seqIdxs):
+            if idx[len(idx) // 2] in center_frame_condition:
+                keys.append(key)
+                idxs.append(idx)
+        return keys, np.asarray(idxs)
+    
     def arange_as_seq(self, data, path, seq_length):
 
         seqInfo = pd.read_csv(join(path, 'seq_info.csv'), index_col = 0)
