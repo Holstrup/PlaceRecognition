@@ -65,3 +65,5 @@ echo "Finished Training"
 # ~/Documents/VisualPlaceRecognition
 # python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'
 # [Errno 2] No such file or directory: 'data/mapillary/train_val/melbourne/query/postprocessed.csv'
+
+# scp -r abho@login2.hpc.dtu.dk:~/Documents/VisualPlaceRecognition/outputs /Users/alexanderholstrup/Desktop

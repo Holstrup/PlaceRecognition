@@ -14,6 +14,14 @@ from cirtorch.datasets.datahelpers import default_loader, imresize, cid2filename
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
+default_cities = {
+    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
+              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'val': ["cph", "sf"],
+    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
+}
+
 class TuplesDataset(data.Dataset):
     """Data loader that loads training and validation tuples of 
         Radenovic etal ECCV16: CNN image retrieval learns from BoW
@@ -78,21 +86,8 @@ class TuplesDataset(data.Dataset):
             # setting fullpath for images
             self.images = [os.path.join(ims_root, db['cids'][i]+'.jpg') for i in range(len(db['cids']))]
         elif name.startswith('mapillary'):
-            root_dir = 'data/mapillary'
-            """
-            default_cities = {
-                'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
-                        "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
-                        "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
-                'val': ["cph", "sf"],
-                'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
-            }
-            """
-            default_cities = {
-                'train': ["melbourne"],
-                'val': ['melbourne'],
-                'test': ["buenosaires"]
-            }
+            # Parameters 
+            root_dir = get_data_root()
             cities = ''
             nNeg = 5
             transform = None
@@ -105,8 +100,6 @@ class TuplesDataset(data.Dataset):
             cached_queries = 1000
             cached_negatives = 1000
             positive_sampling = True
-
-
 
             # initializing
             assert mode in ('train', 'val', 'test')
@@ -122,11 +115,11 @@ class TuplesDataset(data.Dataset):
             else:
                 self.cities = cities.split(',')
 
-            self.qIdx = []
-            self.qImages = []
-            self.pIdx = []
-            self.nonNegIdx = []
-            self.dbImages = []
+            self.qidxs = [] # qIdx
+            self.qpool = [] # qImages
+            self.pidxs = [] # pIdx
+            self.nidxs = [] # nonNegIdx
+            self.ppool = [] # dbImages
             self.sideways = []
             self.night = []
 
@@ -151,12 +144,6 @@ class TuplesDataset(data.Dataset):
             # define sequence length based on task
             if task == 'im2im':
                 seq_length_q, seq_length_db = 1, 1
-            elif task == 'seq2seq':
-                seq_length_q, seq_length_db = seq_length, seq_length
-            elif task == 'seq2im':
-                seq_length_q, seq_length_db = seq_length, 1
-            else: #im2seq
-                seq_length_q, seq_length_db = 1, seq_length
 
             # load data
             for city in self.cities:
@@ -184,16 +171,16 @@ class TuplesDataset(data.Dataset):
 
                     # filter based on subtasks
                     if self.mode in ['val']:
-                        qIdx = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
+                        qidxs = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
                         dbIdx = pd.read_csv(join(root_dir, subdir, city, 'database', 'subtask_index.csv'), index_col = 0)
 
                         # find all the sequence where the center frame belongs to a subtask
-                        val_frames = np.where(qIdx[self.subtask])[0]
+                        val_frames = np.where(qidxs[self.subtask])[0]
                         qSeqKeys, qSeqIdxs = self.filter(qSeqKeys, qSeqIdxs, val_frames)
 
                         val_frames = np.where(dbIdx[self.subtask])[0]
                         dbSeqKeys, dbSeqIdxs = self.filter(dbSeqKeys, dbSeqIdxs, val_frames)
-
+                    
                     # filter based on panorama data
                     if self.exclude_panos:
                         panos_frames = np.where((qDataRaw['pano'] == False).values)[0]
@@ -208,8 +195,8 @@ class TuplesDataset(data.Dataset):
                     # if a combination of city, task and subtask is chosen, where there are no query/dabase images, then continue to next city
                     if len(unique_qSeqIdx) == 0 or len(unique_dbSeqIdx) == 0: continue
 
-                    self.qImages.extend(qSeqKeys)
-                    self.dbImages.extend(dbSeqKeys)
+                    self.qpool.extend(qSeqKeys)
+                    self.ppool.extend(dbSeqKeys)
 
                     qData = qData.loc[unique_qSeqIdx]
                     dbData = dbData.loc[unique_dbSeqIdx]
@@ -233,6 +220,7 @@ class TuplesDataset(data.Dataset):
                         nD, nI = neigh.radius_neighbors(utmQ, self.negDistThr)
 
                     night, sideways, index = qData['night'].values, (qData['view_direction'] == 'Sideways').values, qData.index
+
                     for q_seq_idx in range(len(qSeqKeys)):
 
                         q_frame_idxs = seqIdx2frameIdx(q_seq_idx, qSeqIdxs)
@@ -244,8 +232,8 @@ class TuplesDataset(data.Dataset):
                         if len(p_uniq_frame_idxs) > 0:
                             p_seq_idx = np.unique(uniqFrameIdx2seqIdx(unique_dbSeqIdx[p_uniq_frame_idxs], dbSeqIdxs))
 
-                            self.pIdx.append(p_seq_idx + _lenDb)
-                            self.qIdx.append(q_seq_idx + _lenQ)
+                            self.pidxs.append(p_seq_idx + _lenDb)
+                            self.qidxs.append(q_seq_idx + _lenQ)
 
                             # in training we have two thresholds, one for finding positives and one for finding images that we are certain are negatives.
                             if self.mode == 'train':
@@ -253,54 +241,57 @@ class TuplesDataset(data.Dataset):
                                 n_uniq_frame_idxs = np.unique([n for nonNeg in nI[q_uniq_frame_idx] for n in nonNeg])
                                 n_seq_idx = np.unique(uniqFrameIdx2seqIdx(unique_dbSeqIdx[n_uniq_frame_idxs], dbSeqIdxs))
 
-                                self.nonNegIdx.append(n_seq_idx + _lenDb)
+                                self.nidxs.append(n_seq_idx + _lenDb)
 
                                 # gather meta which is useful for positive sampling
-                                if sum(night[np.in1d(index, q_frame_idxs)]) > 0: self.night.append(len(self.qIdx)-1)
-                                if sum(sideways[np.in1d(index, q_frame_idxs)]) > 0: self.sideways.append(len(self.qIdx)-1)
+                                if sum(night[np.in1d(index, q_frame_idxs)]) > 0: self.night.append(len(self.qidxs)-1)
+                                if sum(sideways[np.in1d(index, q_frame_idxs)]) > 0: self.sideways.append(len(self.qidxs)-1)
 
                         else:
                             query_key = qSeqKeys[q_seq_idx].split('/')[-1][:-4]
                             self.query_keys_with_no_match.append(query_key)
-
-                # when GPS / UTM / pano info is not available
+        
+                # when GPS / UTM / pano info is not available    
                 elif self.mode in ['test']:
 
                     # load images for subtask
-                    qIdx = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
+                    qidxs = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
                     dbIdx = pd.read_csv(join(root_dir, subdir, city, 'database', 'subtask_index.csv'), index_col = 0)
 
                     # arange in sequences
-                    qSeqKeys, qSeqIdxs = self.arange_as_seq(qIdx, join(root_dir, subdir, city, 'query'), seq_length_q)
+                    qSeqKeys, qSeqIdxs = self.arange_as_seq(qidxs, join(root_dir, subdir, city, 'query'), seq_length_q)
                     dbSeqKeys, dbSeqIdxs = self.arange_as_seq(dbIdx, join(root_dir, subdir, city, 'database'), seq_length_db)
 
                     # filter query based on subtask
-                    val_frames = np.where(qIdx[self.subtask])[0]
+                    val_frames = np.where(qidxs[self.subtask])[0]
                     qSeqKeys, qSeqIdxs = self.filter(qSeqKeys, qSeqIdxs, val_frames)
 
                     # filter database based on subtask
                     val_frames = np.where(dbIdx[self.subtask])[0]
                     dbSeqKeys, dbSeqIdxs = self.filter(dbSeqKeys, dbSeqIdxs, val_frames)
 
-                    self.qImages.extend(qSeqKeys)
-                    self.dbImages.extend(dbSeqKeys)
+                    self.qpool.extend(qSeqKeys)
+                    self.ppool.extend(dbSeqKeys)
 
                     # add query index
-                    self.qIdx.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
+                    self.qidxs.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
 
             # if a combination of cities, task and subtask is chosen, where there are no query/database images, then exit
-            if len(self.qImages) == 0 or len(self.dbImages) == 0:
+            if len(self.qpool) == 0 or len(self.ppool) == 0:
                 print("Exiting...")
                 print("A combination of cities, task and subtask have been chosen, where there are no query/database images.")
                 print("Try choosing a different subtask or more cities")
                 sys.exit()
 
+            # creates self.images 
+            self.images = self.qidxs + self.pidxs + self.nidxs
+
             # cast to np.arrays for indexing during training
-            self.qIdx = np.asarray(self.qIdx)
-            self.qImages = np.asarray(self.qImages)
-            self.pIdx = np.asarray(self.pIdx)
-            self.nonNegIdx = np.asarray(self.nonNegIdx)
-            self.dbImages = np.asarray(self.dbImages)
+            self.qidxs = np.asarray(self.qidxs)
+            self.qpool = np.asarray(self.qpool)
+            self.pidxs = np.asarray(self.pidxs)
+            self.nidxs = np.asarray(self.nidxs)
+            self.ppool = np.asarray(self.ppool)
             self.sideways = np.asarray(self.sideways)
             self.night = np.asarray(self.night)
 
@@ -310,44 +301,108 @@ class TuplesDataset(data.Dataset):
             self.bs = 24
 
             if mode == 'train':
-
                 # for now always 1-1 lookup.
-                self.negCache = np.asarray([np.empty((0,), dtype=int)]*len(self.qIdx))
+                self.negCache = np.asarray([np.empty((0,), dtype=int)]*len(self.qidxs))
 
                 # calculate weights for positive sampling
                 if positive_sampling:
                     self.__calcSamplingWeights__()
                 else:
-                    self.weights = np.ones(len(self.qIdx)) / float(len(self.qIdx))
+                    self.weights = np.ones(len(self.qidxs)) / float(len(self.qidxs))
+            
+
+            self.name = name
+            self.mode = mode
+            self.imsize = imsize
+
+            self.nnum = nnum
+            self.qsize = min(qsize, len(self.qpool))
+            self.poolsize = min(poolsize, len(self.images))
+            self.qidxs = None
+            self.pidxs = None
+            self.nidxs = None
+
+            self.transform = transform
+            self.loader = loader
+            self.print_freq = 10
+
+                    
         else:
             raise(RuntimeError("Unknown dataset name!"))
 
-        # initializing tuples dataset
-        self.name = name
-        self.mode = mode
-        self.imsize = imsize
-        self.clusters = db['cluster']
-        self.qpool = db['qidxs']
-        self.ppool = db['pidxs']
+        if name.startswith('retrieval-SfM') or name.startswith('gl'):
+            # initializing tuples dataset
+            self.name = name
+            self.mode = mode
+            self.imsize = imsize
+            self.clusters = db['cluster']
+            self.qpool = db['qidxs']
+            self.ppool = db['pidxs']
 
-        ## If we want to keep only unique q-p pairs 
-        ## However, ordering of pairs will change, although that is not important
-        # qpidxs = list(set([(self.qidxs[i], self.pidxs[i]) for i in range(len(self.qidxs))]))
-        # self.qidxs = [qpidxs[i][0] for i in range(len(qpidxs))]
-        # self.pidxs = [qpidxs[i][1] for i in range(len(qpidxs))]
+            ## If we want to keep only unique q-p pairs 
+            ## However, ordering of pairs will change, although that is not important
+            # qpidxs = list(set([(self.qidxs[i], self.pidxs[i]) for i in range(len(self.qidxs))]))
+            # self.qidxs = [qpidxs[i][0] for i in range(len(qpidxs))]
+            # self.pidxs = [qpidxs[i][1] for i in range(len(qpidxs))]
 
-        # size of training subset for an epoch
-        self.nnum = nnum
-        self.qsize = min(qsize, len(self.qpool))
-        self.poolsize = min(poolsize, len(self.images))
-        self.qidxs = None
-        self.pidxs = None
-        self.nidxs = None
+            # size of training subset for an epoch
+            self.nnum = nnum
+            self.qsize = min(qsize, len(self.qpool))
+            self.poolsize = min(poolsize, len(self.images))
+            self.qidxs = None
+            self.pidxs = None
+            self.nidxs = None
 
-        self.transform = transform
-        self.loader = loader
+            self.transform = transform
+            self.loader = loader
 
-        self.print_freq = 10
+            self.print_freq = 10
+
+        def __calcSamplingWeights__(self):
+            # length of query
+            N = len(self.qIdx)
+
+            # initialize weights
+            self.weights = np.ones(N)
+
+            # weight higher if from night or sideways facing
+            if len(self.night) != 0:
+                self.weights[self.night] += N / len(self.night)
+            if len(self.sideways) != 0:
+                self.weights[self.sideways] += N / len(self.sideways)
+
+            # print weight information
+            print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
+            print("Forward and Day weighted with {:.4f}".format(1))
+            if len(self.night) != 0:
+                print("Forward and Night weighted with {:.4f}".format(1 + N/len(self.night)))
+            if len(self.sideways) != 0:
+                print("Sideways and Day weighted with {:.4f}".format( 1 + N/len(self.sideways)))
+            if len(self.sideways) != 0 and len(self.night) != 0:
+                print("Sideways and Night weighted with {:.4f}".format(1 + N/len(self.night) + N/len(self.sideways)))
+
+    def arange_as_seq(self, data, path, seq_length):
+
+        seqInfo = pd.read_csv(join(path, 'seq_info.csv'), index_col = 0)
+
+        seq_keys, seq_idxs = [], []
+        for idx in data.index:
+
+            # edge cases.
+            if idx < (seq_length//2) or idx >= (len(seqInfo) - seq_length//2): continue
+
+            # find surrounding frames in sequence
+            seq_idx = np.arange(-seq_length//2, seq_length//2) + 1 + idx
+            seq = seqInfo.iloc[seq_idx]
+
+            # the sequence must have the same sequence key and must have consecutive frames
+            if len(np.unique(seq['sequence_key'])) == 1 and (seq['frame_number'].diff()[1:] == 1).all():
+                seq_key = ','.join([join(path, 'images', key + '.jpg') for key in seq['key']])
+
+                seq_keys.append(seq_key)
+                seq_idxs.append(seq_idx)
+
+        return seq_keys, np.asarray(seq_idxs)
 
     def __getitem__(self, index):
         """
