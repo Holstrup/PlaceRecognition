@@ -15,11 +15,9 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
-              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
-              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
-    'val': ["cph", "sf"],
-    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
+    'train': ["zurich"],
+    'val': ["zurich"],
+    'test': ["zurich"]
 }
 
 class TuplesDataset(data.Dataset):
