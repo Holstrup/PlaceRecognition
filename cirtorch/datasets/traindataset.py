@@ -150,8 +150,8 @@ class TuplesDataset(data.Dataset):
                 subdir = 'test' if city in default_cities['test'] else 'train_val'
 
                 # get len of images from cities so far for indexing
-                _lenQ = len(self.qImages)
-                _lenDb = len(self.dbImages)
+                _lenQ = len(self.qpool)
+                _lenDb = len(self.ppool)
 
                 # when GPS / UTM is available
                 if self.mode in ['train','val']:
