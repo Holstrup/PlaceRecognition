@@ -485,6 +485,7 @@ class TuplesDataset(data.Dataset):
 
         # draw poolsize random images for pool of negatives images
         idxs2images = torch.randperm(len(self.images))[:self.poolsize]
+        print(idxs2images[0:3])
 
         # prepare network
         net.cuda()
@@ -520,14 +521,21 @@ class TuplesDataset(data.Dataset):
                 qvecs[:, i] = net(input.cuda()).data.squeeze()
                 if (i+1) % self.print_freq == 0 or (i+1) == len(self.qidxs):
                     print('\r>>>> {}/{} done...'.format(i+1, len(self.qidxs)), end='')
-            print('')
 
             print('>> Extracting descriptors for negative pool...')
             # prepare negative pool data loader
+            #opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
+            #loader = torch.utils.data.DataLoader(
+            #    ImagesFromList(root='', images=[self.images[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
+            #    **opt
+            #)
+
+            opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
-                ImagesFromList(root='', images=[self.images[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
-                batch_size=1, shuffle=False, num_workers=8, pin_memory=True
+                ImagesFromList(root='', images=idxs2images, imsize=self.imsize, transform=self.transform),
+                **opt
             )
+
             # extract negative pool vectors
             poolvecs = torch.zeros(net.meta['outputdim'], len(idxs2images)).cuda()
             for i, input in enumerate(loader):
