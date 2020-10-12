@@ -15,10 +15,10 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["zurich"],
-    'val': ["zurich"],
-    'test': ["zurich"]
-}
+                'train': ["zurich"],
+                'val': ['zurich'],
+                'test': ["buenosaires"]
+            }
 
 class TuplesDataset(data.Dataset):
     """Data loader that loads training and validation tuples of 
@@ -85,7 +85,7 @@ class TuplesDataset(data.Dataset):
             self.images = [os.path.join(ims_root, db['cids'][i]+'.jpg') for i in range(len(db['cids']))]
         elif name.startswith('mapillary'):
             # Parameters 
-            root_dir = get_data_root()
+            root_dir = 'data/mapillary' #get_data_root()
             cities = ''
             nNeg = 5
             transform = None
