@@ -425,11 +425,9 @@ class TuplesDataset(data.Dataset):
         # query image
         #output.append(self.loader(self.images[self.qidxs[index]]))
         output.append(self.loader(self.qidxs[index]))
-        print("Query", self.qidxs[index])
         # positive image
         #output.append(self.loader(self.images[self.pidxs[index]]))
         output.append(self.loader(self.pidxs[index]))
-        print("Positive", self.qidxs[index])
         # negative images
         for i in range(len(self.nidxs[index])):
             print("Negative", self.nidxs[index][i])
@@ -538,10 +536,9 @@ class TuplesDataset(data.Dataset):
             #    **opt
             #)
 
-            # TODO: Remove again qidxs again. 
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
-                ImagesFromList(root='', images=self.pidxs, imsize=self.imsize, transform=self.transform),
+                ImagesFromList(root='', images=[self.images[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
                 **opt
             )
 
@@ -581,7 +578,6 @@ class TuplesDataset(data.Dataset):
                     n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
-            print(self.nidxs[0:2])
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
 
