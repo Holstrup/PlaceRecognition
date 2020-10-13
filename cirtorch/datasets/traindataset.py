@@ -425,11 +425,14 @@ class TuplesDataset(data.Dataset):
         # query image
         #output.append(self.loader(self.images[self.qidxs[index]]))
         output.append(self.loader(self.qidxs[index]))
+        print("Query", self.qidxs[index])
         # positive image
         #output.append(self.loader(self.images[self.pidxs[index]]))
         output.append(self.loader(self.pidxs[index]))
+        print("Positive", self.qidxs[index])
         # negative images
         for i in range(len(self.nidxs[index])):
+            print("Negative", self.nidxs[index][i])
             output.append(self.loader(self.nidxs[index][i]))
 
         if self.imsize is not None:
@@ -576,6 +579,7 @@ class TuplesDataset(data.Dataset):
                     n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
+            print(self.nidxs[0:2])
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
 
