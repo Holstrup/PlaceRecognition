@@ -559,6 +559,28 @@ class TuplesDataset(data.Dataset):
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
+                qcluster = self.qidxs[q]
+                clusters = [qcluster]
+                nidxs = []
+                r = 0
+                #TODO: How do I use this clusters information? 
+                while len(nidxs) < self.nnum:
+                    potential = idxs2images[ranks[r, q]]
+                    # take at most one image from the same cluster
+                    #if not self.clusters[potential] in clusters:
+                    nidxs.append(potential)
+                    #    clusters.append(self.clusters[potential])
+                    avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
+                    n_ndist += 1
+                    r += 1
+                self.nidxs.append(nidxs)
+            print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
+            print('>>>> Done')
+
+            """
+            for q in range(len(self.qidxs)):
+                # do not use query cluster,
+                # those images are potentially positive
                 qcluster = self.clusters[self.qidxs[q]]
                 clusters = [qcluster]
                 nidxs = []
@@ -575,5 +597,6 @@ class TuplesDataset(data.Dataset):
                 self.nidxs.append(nidxs)
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
+            """
 
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
