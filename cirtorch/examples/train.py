@@ -356,7 +356,11 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
-
+        # TODO: Debugging
+        if i == 0:
+            print(input[0])
+            print(target)
+            print(input[0][0])
         for q in range(nq):
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):

@@ -430,7 +430,6 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.pidxs[index]))
         # negative images
         for i in range(len(self.nidxs[index])):
-            print("Negative", self.nidxs[index][i])
             output.append(self.loader(self.nidxs[index][i]))
 
         if self.imsize is not None:
