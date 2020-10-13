@@ -282,13 +282,13 @@ class TuplesDataset(data.Dataset):
                 sys.exit()
 
             # creates self.images 
-            self.images = self.qidxs + self.pidxs + self.nidxs
+            self.images = self.qpool + self.ppool #self.qidxs + self.pidxs + self.nidxs
 
             # cast to np.arrays for indexing during training
             self.qidxs = np.asarray(self.qidxs)
-            self.qpool = np.asarray(self.qpool)
             self.pidxs = np.asarray(self.pidxs)
             self.nidxs = np.asarray(self.nidxs)
+            self.qpool = np.asarray(self.qpool)
             self.ppool = np.asarray(self.ppool)
             self.sideways = np.asarray(self.sideways)
             self.night = np.asarray(self.night)
@@ -561,6 +561,7 @@ class TuplesDataset(data.Dataset):
             n_ndist = torch.tensor(0).float().cuda()  # for statistics
             # selection of negative examples
             self.nidxs = []
+            #self.pidxs = [self.ppool[i] for i in idxs2qpool]
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
