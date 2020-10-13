@@ -423,12 +423,14 @@ class TuplesDataset(data.Dataset):
 
         output = []
         # query image
-        output.append(self.loader(self.images[self.qidxs[index]]))
+        #output.append(self.loader(self.images[self.qidxs[index]]))
+        output.append(self.loader(self.qidxs[index]))
         # positive image
-        output.append(self.loader(self.images[self.pidxs[index]]))
+        #output.append(self.loader(self.images[self.pidxs[index]]))
+        output.append(self.loader(self.pidxs[index]))
         # negative images
         for i in range(len(self.nidxs[index])):
-            output.append(self.loader(self.images[self.nidxs[index][i]]))
+            output.append(self.loader(self.nidxs[index][i]))
 
         if self.imsize is not None:
             output = [imresize(img, self.imsize) for img in output]
