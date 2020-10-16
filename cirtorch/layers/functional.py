@@ -17,7 +17,7 @@ def spoc(x):
     return F.avg_pool2d(x, (x.size(-2), x.size(-1)))
     # return F.adaptive_avg_pool2d(x, (1,1)) # alternative
 
-
+# TODO: Was p not a parameter we learn? 
 def gem(x, p=3, eps=1e-6):
     return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1./p)
     # return F.lp_pool2d(F.threshold(x, eps, eps), p, (x.size(-2), x.size(-1))) # alternative
@@ -151,6 +151,27 @@ def contrastive_loss(x, label, margin=0.7, eps=1e-6):
 
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+    y = 0.5*lbl*torch.pow(D,2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y
+
+def linear_weighted_contrastive_loss(x, label, margin=0.7, eps=1e-6):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+    dist = 24 # haversine(query - positive)
+    weighting = 1 - torch.div(dist,25) 
 
     y = 0.5*lbl*torch.pow(D,2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)

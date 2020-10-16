@@ -25,6 +25,7 @@ from cirtorch.utils.download import download_train, download_test
 from cirtorch.utils.whiten import whitenlearn, whitenapply
 from cirtorch.utils.evaluate import compute_map_and_print
 from cirtorch.utils.general import get_data_root, htime
+from torch.utils.tensorboard import SummaryWriter
 
 training_dataset_names = ['mapillary'] #[ 'retrieval-SfM-120k']
 test_datasets_names = ['oxford5k', 'paris6k', 'roxford5k', 'rparis6k']
@@ -36,6 +37,7 @@ model_names = sorted(name for name in models.__dict__
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
 loss_names = ['contrastive', 'triplet']
 optimizer_names = ['sgd', 'adam']
+writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 
@@ -164,7 +166,6 @@ def main():
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
     
     # set random seeds
-    # TODO: maybe pass as argument in future implementation?
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
     np.random.seed(0)
@@ -231,7 +232,6 @@ def main():
         optimizer = torch.optim.Adam(parameters, args.lr, weight_decay=args.weight_decay)
 
     # define learning rate decay schedule
-    # TODO: maybe pass as argument in future implementation?
     exp_decay = math.exp(-0.01)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=exp_decay)
 
@@ -310,12 +310,14 @@ def main():
 
         # train for one epoch on train set
         loss = train(train_loader, model, criterion, optimizer, epoch)
+        writer.add_scalar('Loss/train', loss, epoch)
 
         # evaluate on validation set
         if args.val:
             with torch.no_grad():
                 loss = validate(val_loader, model, criterion, epoch)
-
+                writer.add_scalar('Loss/validation', loss, epoch)
+        
         # evaluate on test datasets every test_freq epochs
         if (epoch + 1) % args.test_freq == 0:
             with torch.no_grad():
@@ -356,11 +358,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
-        # TODO: Debugging
-        if i == 0:
-            print(input[0])
-            print(target)
-            print(input[0][0])
+
+        #TODO: Plot triplets
+        
         for q in range(nq):
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):

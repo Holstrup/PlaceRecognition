@@ -70,7 +70,6 @@ class TuplesDataset(data.Dataset):
             self.images = [cid2filename(db['cids'][i], ims_root) for i in range(len(db['cids']))]
 
         elif name.startswith('gl'):
-            ## TODO: NOT IMPLEMENTED YET PROPOERLY (WITH AUTOMATIC DOWNLOAD)
 
             # setting up paths
             db_root = '/mnt/fry2/users/datasets/landmarkscvprw18/recognition/'
@@ -423,11 +422,11 @@ class TuplesDataset(data.Dataset):
 
         output = []
         # query image
-        #output.append(self.loader(self.images[self.qidxs[index]]))
         output.append(self.loader(self.qidxs[index]))
+        # TODO: Get query GPS coordinates here
         # positive image
-        #output.append(self.loader(self.images[self.pidxs[index]]))
         output.append(self.loader(self.pidxs[index]))
+        # TODO: Get positive GPS coordinates here
         # negative images
         for i in range(len(self.nidxs[index])):
             output.append(self.loader(self.nidxs[index][i]))
@@ -439,7 +438,7 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-
+        # labels = {'label': label, 'gps':gps}
         return output, target
 
     def __len__(self):
