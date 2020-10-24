@@ -37,7 +37,7 @@ model_names = sorted(name for name in models.__dict__
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
 loss_names = ['contrastive', 'triplet']
 optimizer_names = ['sgd', 'adam']
-writer = SummaryWriter()
+#writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 
@@ -256,7 +256,11 @@ def main():
 
     # Data loading code
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
+    # TODO: Set Image Size
+    #resize = transforms.Resize((320,240), interpolation=2)
+
     transform = transforms.Compose([
+        #resize,
         transforms.ToTensor(),
         normalize,
     ])
@@ -310,13 +314,13 @@ def main():
 
         # train for one epoch on train set
         loss = train(train_loader, model, criterion, optimizer, epoch)
-        writer.add_scalar('Loss/train', loss, epoch)
+        #writer.add_scalar('Loss/train', loss, epoch)
 
         # evaluate on validation set
         if args.val:
             with torch.no_grad():
                 loss = validate(val_loader, model, criterion, epoch)
-                writer.add_scalar('Loss/validation', loss, epoch)
+                #writer.add_scalar('Loss/validation', loss, epoch)
         
         # evaluate on test datasets every test_freq epochs
         if (epoch + 1) % args.test_freq == 0:
