@@ -13,7 +13,9 @@ from sklearn.neighbors import NearestNeighbors
 from cirtorch.datasets.datahelpers import default_loader, imresize, cid2filename
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
+from torch.utils.tensorboard import SummaryWriter
 
+writer = SummaryWriter()
 default_cities = {
                 'train': ["zurich"],
                 'val': ['zurich'],
@@ -439,8 +441,17 @@ class TuplesDataset(data.Dataset):
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
         # labels = {'label': label, 'gps':gps}
-        print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
+        #print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
+        if index == 3:
+            tuple_to_tensorboard(output)
         return output, target
+    
+    def tuple_to_tensorboard(output):
+        img = np.zeros((3, 100, 100))
+        img[0] = np.arange(0, 10000).reshape(100, 100) / 10000
+        img[1] = 1 - np.arange(0, 10000).reshape(100, 100) / 10000
+        writer.add_image('my_image', img, 0)
+        return None
 
     def __len__(self):
         # if not self.qidxs:

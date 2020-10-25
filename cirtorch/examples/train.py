@@ -37,7 +37,7 @@ model_names = sorted(name for name in models.__dict__
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
 loss_names = ['contrastive', 'triplet']
 optimizer_names = ['sgd', 'adam']
-#writer = SummaryWriter()
+writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 
@@ -138,7 +138,7 @@ def main():
     # check if test dataset are downloaded
     # and download if they are not
     download_train(get_data_root())
-    download_test(get_data_root())
+    #download_test(get_data_root())
 
     # create export dir if it doesnt exist
     directory = "{}".format(args.training_dataset)
@@ -296,7 +296,7 @@ def main():
 
     # evaluate the network before starting
     # this might not be necessary?
-    test(args.test_datasets, model)
+    #test(args.test_datasets, model)
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -314,18 +314,18 @@ def main():
 
         # train for one epoch on train set
         loss = train(train_loader, model, criterion, optimizer, epoch)
-        #writer.add_scalar('Loss/train', loss, epoch)
+        writer.add_scalar('Loss/train', loss, epoch)
 
         # evaluate on validation set
         if args.val:
             with torch.no_grad():
                 loss = validate(val_loader, model, criterion, epoch)
-                #writer.add_scalar('Loss/validation', loss, epoch)
+                writer.add_scalar('Loss/validation', loss, epoch)
         
         # evaluate on test datasets every test_freq epochs
-        if (epoch + 1) % args.test_freq == 0:
-            with torch.no_grad():
-                test(args.test_datasets, model)
+        #if (epoch + 1) % args.test_freq == 0:
+        #    with torch.no_grad():
+        #        test(args.test_datasets, model)
 
         # remember best loss and save checkpoint
         is_best = loss < min_loss
