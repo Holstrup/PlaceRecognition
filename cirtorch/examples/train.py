@@ -355,11 +355,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
     optimizer.zero_grad()
 
     end = time.time()
-    for i, (input, target, gps_info) in enumerate(train_loader):
+    for i, datatuple in enumerate(train_loader):
     #for i, (input, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-
+        if len(datatuple) == 3:
+            (input, target, gps_info) = datatuple
+        else:
+            (input, target) = datatuple
+            gps_info = [0,0]
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
