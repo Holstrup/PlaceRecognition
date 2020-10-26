@@ -255,6 +255,8 @@ def main():
             print(">> No checkpoint found at '{}'".format(args.resume))
 
     # Data loading code
+    print('MEAN: ' + str(model.meta['mean']))
+    print('STD: ' + str(model.meta['std']))
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
     # TODO: Set Image Size
     resize = transforms.Resize((320,240), interpolation=2)
@@ -367,10 +369,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
             if i % 5 == 0:
                 print(gps_info)
                 print("Adding Images")
+                std = 0.5
+                mean = 0.5
                 
                 url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
                 # Write Image 
                 img = torch.squeeze(input[q][0])
+                img = ((img * std) + mean)
                 writer.add_image('Query', img, epoch)
 
                 img = torch.squeeze(input[q][1])
