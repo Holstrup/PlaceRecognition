@@ -442,16 +442,15 @@ class TuplesDataset(data.Dataset):
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
         # labels = {'label': label, 'gps':gps}
         #print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
-        if index == 3:
-            tuple_to_tensorboard(output)
         return output, target
-    
+    """
     def tuple_to_tensorboard(output):
         img = np.zeros((3, 100, 100))
         img[0] = np.arange(0, 10000).reshape(100, 100) / 10000
         img[1] = 1 - np.arange(0, 10000).reshape(100, 100) / 10000
         writer.add_image('my_image', img, 0)
         return None
+    """
 
     def __len__(self):
         # if not self.qidxs:
@@ -568,7 +567,6 @@ class TuplesDataset(data.Dataset):
             n_ndist = torch.tensor(0).float().cuda()  # for statistics
             # selection of negative examples
             self.nidxs = []
-            #self.pidxs = [self.ppool[i] for i in idxs2qpool]
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
@@ -591,7 +589,52 @@ class TuplesDataset(data.Dataset):
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
 
+            """ MSLS
+                    for q in range(len(qidxs)):
+
+            qidx = qidxs[q]
+
+            # find positive idx for this query (cache idx domain)
+            cached_pidx = np.where(np.in1d(pidxs, self.pIdx[qidx]))
+
+            # find idx of positive idx in rank matrix (descending cache idx domain)
+            pidx = np.where(np.in1d(pRanks[q,:], cached_pidx))
+
+            # take the closest positve
+            dPos = pScores[q, pidx][0][0]
+
+            # get distances to all negatives
+            dNeg = nScores[q, :]
+
+            # how much are they violating
+            loss = dPos - dNeg + self.margin ** 0.5
+            violatingNeg = 0 < loss
+
+            # if less than nNeg are violating then skip this query
+            if np.sum(violatingNeg) <= self.nNeg: continue
+
+            # select hardest negatives
+            hardest_negIdx = np.argsort(loss)[:self.nNeg]
+
+            # select the hardest negatives
+            cached_hardestNeg = nRanks[q, hardest_negIdx]
+
+            # select the closest positive (back to cache idx domain)
+            cached_pidx = pRanks[q, pidx][0][0]
+
+            # transform back to original index (back to original idx domain)
+            qidx = self.qIdx[qidx]
+            pidx = pidxs[cached_pidx]
+            hardestNeg = nidxs[cached_hardestNeg]
+
+            # package the triplet and target
+            triplet = [qidx, pidx, *hardestNeg]
+            target = [-1, 1] + [0]*len(hardestNeg)
+
+            self.triplets.append((triplet, target))
             """
+            
+            """ Old 
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive

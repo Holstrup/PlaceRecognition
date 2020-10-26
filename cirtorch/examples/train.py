@@ -368,7 +368,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
         for q in range(nq):
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
-
+                print(input[q][imi])
+                writer.add_image('my_image', input[q][imi], epoch)
                 # compute output vector for image imi
                 output[:, imi] = model(input[q][imi].cuda()).squeeze()
 
