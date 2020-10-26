@@ -440,8 +440,8 @@ class TuplesDataset(data.Dataset):
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
         # labels = {'label': label, 'gps':gps}
         #print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
-        gps_info = {'ABCD': [55.7779605,12.5168507]}
-        return {'data': (output, target), 'gps': gps_info}
+        gps_info = [55.7779605,12.5168507]
+        return output, target, gps_info
         #return output, target
 
     def __len__(self):

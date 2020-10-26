@@ -355,9 +355,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
     optimizer.zero_grad()
 
     end = time.time()
-    for i, data in enumerate(train_loader):
+    for i, (input, target, gps_info) in enumerate(train_loader):
     #for i, (input, target) in enumerate(train_loader):
-        (input, target) = data['data']
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -367,7 +366,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         
         for q in range(nq):
             if i % 5 == 0:
-                print(data['gps'])
+                print(gps_info)
                 print("Adding Images")
                 
                 url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
