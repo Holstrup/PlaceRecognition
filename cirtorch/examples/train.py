@@ -355,7 +355,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
     optimizer.zero_grad()
 
     end = time.time()
-    for i, (input, target) in enumerate(train_loader):
+    for i, data in enumerate(train_loader):
+    #for i, (input, target) in enumerate(train_loader):
+        (input, target) = data['data']
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -365,16 +367,21 @@ def train(train_loader, model, criterion, optimizer, epoch):
         
         for q in range(nq):
             if i % 5 == 0:
+                print(data['gps'])
                 print("Adding Images")
+                
+                url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
                 # Write Image 
                 img = torch.squeeze(input[q][0])
                 writer.add_image('Query', img, epoch)
 
                 img = torch.squeeze(input[q][1])
-                writer.add_image('Positive', img, epoch)
+                url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
+                writer.add_image('Positive: {}'.format(url), img, epoch)
 
                 img = torch.squeeze(input[q][2])
-                writer.add_image('Negative', img, epoch)
+                url = "https://www.google.com/maps/dir/QUERY_POINT/NEGATIVE_POINT/@QUERY_POINT,14.75z"
+                writer.add_image('Negative: {}'.format(url), img, epoch)
 
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
