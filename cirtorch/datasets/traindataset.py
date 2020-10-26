@@ -441,8 +441,7 @@ class TuplesDataset(data.Dataset):
         # labels = {'label': label, 'gps':gps}
         #print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
         gps_info = [55.7779605,12.5168507]
-        outputdict = {'output': output, 'target': target, 'gps_info': gps_info}
-        return outputdict
+        return (output, target, gps_info)
         #return output, target
 
     def __len__(self):

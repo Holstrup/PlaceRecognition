@@ -51,6 +51,7 @@ def flip(x, dim):
     return x.view(xsize)
 
 def collate_tuples(batch):
+    #TODO: Make it not throw gps info away
     if len(batch) == 1:
-        return [batch[0][0]], [batch[0][1]]
-    return [batch[i][0] for i in range(len(batch))], [batch[i][1] for i in range(len(batch))]
+        return [batch[0][0]], [batch[0][1]], [batch[0][2]]
+    return [batch[i][0] for i in range(len(batch))], [batch[i][1] for i in range(len(batch))], [batch[i][2] for i in range(len(batch))]
