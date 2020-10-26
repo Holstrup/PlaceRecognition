@@ -367,23 +367,22 @@ def train(train_loader, model, criterion, optimizer, epoch):
         
         for q in range(nq):
             if i % 5 == 0:
-                print(gps_info)
-                print("Adding Images")
                 mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                 std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
                 
                 url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
                 # Write Image 
                 img = torch.squeeze(input[q][0])
-                torch.mul(img, std)
                 img = ((img * std) + mean)
                 writer.add_image('Query', img, epoch)
 
                 img = torch.squeeze(input[q][1])
+                img = ((img * std) + mean)
                 url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
                 writer.add_image('Positive: {}'.format(url), img, epoch)
 
                 img = torch.squeeze(input[q][2])
+                img = ((img * std) + mean)
                 url = "https://www.google.com/maps/dir/QUERY_POINT/NEGATIVE_POINT/@QUERY_POINT,14.75z"
                 writer.add_image('Negative: {}'.format(url), img, epoch)
 
