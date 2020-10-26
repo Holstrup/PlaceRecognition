@@ -257,10 +257,10 @@ def main():
     # Data loading code
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
     # TODO: Set Image Size
-    #resize = transforms.Resize((320,240), interpolation=2)
+    resize = transforms.Resize((320,240), interpolation=2)
 
     transform = transforms.Compose([
-        #resize,
+        resize,
         transforms.ToTensor(),
         normalize,
     ])
@@ -368,8 +368,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
         for q in range(nq):
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
-                print(input[q][imi])
-                writer.add_image('my_image', input[q][imi], epoch)
+                img = torch.squeeze(input[q][imi])
+                print(img)
+                writer.add_image('my_image', img, epoch)
+                
                 # compute output vector for image imi
                 output[:, imi] = model(input[q][imi].cuda()).squeeze()
 
