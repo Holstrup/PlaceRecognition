@@ -362,16 +362,22 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
-
-        #TODO: Plot triplets
         
         for q in range(nq):
+            if i % 5 == 0:
+                print("Adding Images")
+                # Write Image 
+                img = torch.squeeze(input[q][0])
+                writer.add_image('Query', img, epoch)
+
+                img = torch.squeeze(input[q][1])
+                writer.add_image('Positive', img, epoch)
+
+                img = torch.squeeze(input[q][2])
+                writer.add_image('Negative', img, epoch)
+
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
-                img = torch.squeeze(input[q][imi])
-                print(img)
-                writer.add_image('my_image', img, epoch)
-                
                 # compute output vector for image imi
                 output[:, imi] = model(input[q][imi].cuda()).squeeze()
 
