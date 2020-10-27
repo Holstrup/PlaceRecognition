@@ -430,12 +430,11 @@ class TuplesDataset(data.Dataset):
         output = []
         # query image
         output.append(self.loader(self.qidxs[index]))
-        print('QIdx: ', self.qidxs[index])
-        print('QIdx GPS: ', self.gpsInfo[self.qidxs[index]])
+        idx = self.qidxs[index].split('/')[-1][:-4]
+        print('QIdx: ', idx)
+        print('QIdx GPS: ', self.gpsInfo[idx])
         # positive image
         output.append(self.loader(self.pidxs[index]))
-        print('QIdx: ', self.pidxs[index])
-        print('QIdx GPS: ', self.gpsInfo[self.pidxs[index]])
         # negative images
         for i in range(len(self.nidxs[index])):
             output.append(self.loader(self.nidxs[index][i]))
