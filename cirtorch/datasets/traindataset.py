@@ -431,8 +431,6 @@ class TuplesDataset(data.Dataset):
         # query image
         output.append(self.loader(self.qidxs[index]))
         idx = self.qidxs[index].split('/')[-1][:-4]
-        print('QIdx: ', idx)
-        print('QIdx GPS: ', self.gpsInfo[idx])
         # positive image
         output.append(self.loader(self.pidxs[index]))
         # negative images
@@ -446,11 +444,16 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-        # labels = {'label': label, 'gps':gps}
-        #print('Tuple (Q, P, N): ', self.qidxs[index], self.pidxs[index], self.nidxs[index])
-        gps_info = [55.7779605,12.5168507]
+        gps_info = getGpsInformation(output)
         return (output, target, gps_info)
-        #return output, target
+
+    def getGpsInformation(self, output):
+        gps_info = []
+        gps_info.append(output[0].split('/')[-1][:-4])
+        gps_info.append(output[1].split('/')[-1][:-4])
+        for negative in output[2]:
+            gps_info.append(negative.split('/')[-1][:-4])
+        return gps_info
 
     def __len__(self):
         # if not self.qidxs:
