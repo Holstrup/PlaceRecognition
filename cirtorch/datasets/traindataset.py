@@ -158,12 +158,12 @@ class TuplesDataset(data.Dataset):
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
-                    addGpsInfo(qDataRaw)
+                    self.addGpsInfo(qDataRaw)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
-                    dbDataRaw(qDataRaw)
+                    self.addGpsInfo(qDataRaw)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -360,7 +360,7 @@ class TuplesDataset(data.Dataset):
 
     def addGpsInfo(self, dataframe):
         for index, row in dataframe.iterrows():
-            gpsInfo[row['key']] = [row['lon'], row['lon']]
+            self.gpsInfo[row['key']] = [row['lon'], row['lon']]
 
     def __calcSamplingWeights__(self):
         # length of query
@@ -430,10 +430,12 @@ class TuplesDataset(data.Dataset):
         output = []
         # query image
         output.append(self.loader(self.qidxs[index]))
-        # TODO: Get query GPS coordinates here
+        print('QIdx: ', self.qidxs[index])
+        print('QIdx GPS: ', self.gpsInfo[self.qidxs[index]])
         # positive image
         output.append(self.loader(self.pidxs[index]))
-        # TODO: Get positive GPS coordinates here
+        print('QIdx: ', self.pidxs[index])
+        print('QIdx GPS: ', self.gpsInfo[self.pidxs[index]])
         # negative images
         for i in range(len(self.nidxs[index])):
             output.append(self.loader(self.nidxs[index][i]))
