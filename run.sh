@@ -58,12 +58,3 @@ pip3 install -r requirements.txt
 echo "Starting Training"
 python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'
 echo "Finished Training"
-
-#scp -r /Users/alexanderholstrup/Desktop/train_val/zurich abho@login2.hpc.dtu.dk:~/Documents/VisualPlaceRecognition/data/mapillary/train_val
-# ~/Documents/VisualPlaceRecognition/data/mapillary/train_val/zurich
-# sxm2sh
-# ~/Documents/VisualPlaceRecognition
-# python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'
-# [Errno 2] No such file or directory: 'data/mapillary/train_val/melbourne/query/postprocessed.csv'
-
-# scp -r abho@login2.hpc.dtu.dk:~/Documents/VisualPlaceRecognition/outputs /Users/alexanderholstrup/Desktop

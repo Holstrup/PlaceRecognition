@@ -15,8 +15,8 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-                'train': ["zurich"],
-                'val': ['zurich'],
+                'train': ["zurich"], #["zurich", "helsinki"],
+                'val': ["zurich"], #['cph'],
                 'test': ["buenosaires"]
             }
 
@@ -36,15 +36,15 @@ class TuplesDataset(data.Dataset):
         poolsize (int, Default:10000): Pool size for negative images re-mining
 
      Attributes:
-        images (list): List of full filenames for each image
-        clusters (list): List of clusterID per image
-        qpool (list): List of all query image indexes
-        ppool (list): List of positive image indexes, each corresponding to query at the same position in qpool
+        images (list): List of full filenames for each image (qimages + dbimages)
+        clusters (list): List of clusterID per image (nonNegIdx)
+        qpool (list): List of all query image indexes (qidx)
+        ppool (list): List of positive image indexes, each corresponding to query at the same position in qpool (pidx)
 
-        qidxs (list): List of qsize query image indexes to be processed in an epoch
-        pidxs (list): List of qsize positive image indexes, each corresponding to query at the same position in qidxs
+        qidxs (list): List of qsize query image indexes to be processed in an epoch (qidx without self)
+        pidxs (list): List of qsize positive image indexes, each corresponding to query at the same position in qidxs (pidx without self)
         nidxs (list): List of qsize tuples of negative images
-                        Each nidxs tuple contains nnum images corresponding to query image at the same position in qidxs
+                        Each nidxs tuple contains nnum images corresponding to query image at the same position in qidxs (nidxs without self)
 
         Lists qidxs, pidxs, nidxs are refreshed by calling the ``create_epoch_tuples()`` method, 
             ie new q-p pairs are picked and negative images are remined
@@ -137,6 +137,7 @@ class TuplesDataset(data.Dataset):
             # other
             self.transform = transform
             self.query_keys_with_no_match = []
+            self.gpsInfo = {}
 
             # define sequence length based on task
             if task == 'im2im':
@@ -157,10 +158,12 @@ class TuplesDataset(data.Dataset):
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
+                    addGpsInfo(qDataRaw)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
+                    dbDataRaw(qDataRaw)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -355,6 +358,10 @@ class TuplesDataset(data.Dataset):
 
             self.print_freq = 10
 
+    def addGpsInfo(self, dataframe):
+        for index, row in dataframe.iterrows():
+            gpsInfo[row['key']] = [row['lon'], row['lon']]
+
     def __calcSamplingWeights__(self):
         # length of query
         N = len(self.qidxs)
@@ -499,16 +506,6 @@ class TuplesDataset(data.Dataset):
         with torch.no_grad():
 
             print('>> Extracting descriptors for query images...')
-            print(self.qidxs[0:2], type(self.qidxs[0]))
-            print('---')
-            print(self.qpool[0], type(self.qpool[0]))
-            print('---')
-            print(idxs2images[0:3])
-            print('---')
-            print([self.images[i] for i in idxs2images][0:3])
-            print('---')
-
-            
             
             # prepare query loader
             #loader = torch.utils.data.DataLoader(
@@ -563,14 +560,14 @@ class TuplesDataset(data.Dataset):
                 # do not use query cluster,
                 # those images are potentially positive
                 qcluster = self.qidxs[q]
-                clusters = [qcluster]
+                clusters = [qcluster] #TODO: nonNegQidx
                 nidxs = []
                 r = 0
                 #TODO: How do I use this clusters information? 
                 while len(nidxs) < self.nnum:
                     potential = idxs2images[ranks[r, q]]
-                    # take at most one image from the same cluste
-                    
+                    # take at most one image from the same cluster
+                    # TODO: if potential not in self.nonNegIdx[q]
                     #if not self.clusters[potential] in clusters:
                     nidxs.append(self.images[potential])
                     #    clusters.append(self.clusters[potential])

@@ -416,6 +416,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         end = time.time()
 
         if (i+1) % args.print_freq == 0 or i == 0 or (i+1) == len(train_loader):
+            writer.add_scalar('Loss/train_batch', losses.avg, epoch)
             print('>> Train: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -437,7 +438,7 @@ def validate(val_loader, model, criterion, epoch):
     model.eval()
 
     end = time.time()
-    for i, (input, target) in enumerate(val_loader):
+    for i, (input, target, gps_info) in enumerate(val_loader):
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
@@ -461,6 +462,7 @@ def validate(val_loader, model, criterion, epoch):
         end = time.time()
 
         if (i+1) % args.print_freq == 0 or i == 0 or (i+1) == len(val_loader):
+            writer.add_scalar('Loss/val_batch', losses.avg, epoch)
             print('>> Val: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
