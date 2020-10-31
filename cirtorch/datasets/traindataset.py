@@ -360,7 +360,7 @@ class TuplesDataset(data.Dataset):
 
     def addGpsInfo(self, dataframe):
         for index, row in dataframe.iterrows():
-            self.gpsInfo[row['key']] = [row['lon'], row['lon']]
+            self.gpsInfo[row['key']] = [row['lat'], row['lon']]
 
     def __calcSamplingWeights__(self):
         # length of query
