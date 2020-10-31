@@ -449,10 +449,10 @@ class TuplesDataset(data.Dataset):
 
     def getGpsInformation(self, index):
         gps_info = []
-        gps_info.append(self.qidxs[index].split('/')[-1][:-4])
-        gps_info.append(self.pidxs[index].split('/')[-1][:-4])
+        gps_info.append(self.gpsInfo[self.qidxs[index].split('/')[-1][:-4]])
+        gps_info.append(self.gpsInfo[self.pidxs[index].split('/')[-1][:-4]])
         for negative in self.nidxs[index]:
-            gps_info.append(negative.split('/')[-1][:-4])
+            gps_info.append(self.gpsInfo[negative.split('/')[-1][:-4]])
         return gps_info
 
     def __len__(self):
