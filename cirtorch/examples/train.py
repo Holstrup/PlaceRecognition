@@ -361,16 +361,16 @@ def train(train_loader, model, criterion, optimizer, epoch):
     #for i, (input, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-        print('GPS INFO: ', gps_info)
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         
         for q in range(nq):
             if i % 5 == 0:
+                print('GPS INFO: ', gps_info[q])
+                
                 mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                 std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-                
                 url = "https://www.google.com/maps/dir/QUERY_POINT/POSITIVE_POINT/@QUERY_POINT,14.75z"
                 # Write Image 
                 img = torch.squeeze(input[q][0])
