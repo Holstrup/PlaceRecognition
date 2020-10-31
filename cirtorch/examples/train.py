@@ -371,7 +371,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 
                 mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                 std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(gps_info[q][0].join(','), gps_info[q][0].join(','), gps_info[q][0].join(','))
+                ','.join(gps_info[q][0])
+                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(gps_info[q][0]), ','.join(gps_info[q][0]), ','.join(gps_info[q][0]))
                 # Write Image 
                 img = torch.squeeze(input[q][0])
                 img = ((img * std) + mean)
@@ -379,13 +380,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
                 img = torch.squeeze(input[q][1])
                 img = ((img * std) + mean)
-                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(gps_info[q][0].join(','), gps_info[q][1].join(','), gps_info[q][0].join(','))
-                print('Postive ',url)
+                #url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(gps_info[q][0]), ','.join(gps_info[q][1]), ','.join(gps_info[q][0]))
+                url = '<a href="google.com/maps/dir/47.358985,8.52384/47.358144,8.524148/@47.3587209,8.5243639,18.67z">Positive Distance</a>'
                 writer.add_image('Positive: {}'.format(url), img, epoch)
 
                 img = torch.squeeze(input[q][2])
                 img = ((img * std) + mean)
-                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(gps_info[q][0], gps_info[q][2], gps_info[q][0])
+                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(gps_info[q][0]), ','.join(gps_info[q][2]), ','.join(gps_info[q][0]))
                 print('Negative ',url)
                 writer.add_image('Negative: {}'.format(url), img, epoch)
 
