@@ -156,7 +156,7 @@ def contrastive_loss(x, label, margin=0.7, eps=1e-6):
     y = torch.sum(y)
     return y
 
-def linear_weighted_contrastive_loss(x, label, margin=0.7, eps=1e-6):
+def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
     # x is D x N
     dim = x.size(0) # D
     nq = torch.sum(label.data==-1) # number of tuples
@@ -170,10 +170,10 @@ def linear_weighted_contrastive_loss(x, label, margin=0.7, eps=1e-6):
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
 
-    dist = 24 # haversine(query - positive)
+    dist = 24 # TODO: Haversine(query - positive)
     weighting = 1 - torch.div(dist,25) 
 
-    y = 0.5*lbl*torch.pow(D,2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 

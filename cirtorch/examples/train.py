@@ -366,28 +366,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
         ni = len(input[0]) # number of images per tuple
         
         for q in range(nq):
-            if i % 5 == 0:
+            if i % 50 == 0:
                 print('GPS INFO: ', gps_info[q])
-                """
-                mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
-                std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][0]))
-                # Write Image 
-                img = torch.squeeze(input[q][0])
-                img = ((img * std) + mean)
-                writer.add_image('Query', img, epoch)
-
-                img = torch.squeeze(input[q][1])
-                img = ((img * std) + mean)
-                writer.add_image('Positive: {}'.format(url), img, epoch)
-
-                img = torch.squeeze(input[q][2])
-                img = ((img * std) + mean)
-                url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][2]), ','.join(str(x) for x in gps_info[q][0]))
-                print('Negative ',url)
-                writer.add_image('Negative: {}'.format(url), img, epoch)
-                """
-                writer.add_images('my_image_batch', gps_info[q], 0)
+                
+                images = input[q][0] * std + mean
+                for image_tensor in input[q][1:]:
+                    torch.stack([images, image_tensor * std + mean], dim=0)
+                writer.add_images('ImageBatch{},{}'.format(epoch,i), images, 0)
 
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
