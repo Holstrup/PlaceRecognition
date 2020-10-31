@@ -259,7 +259,7 @@ def main():
     print('STD: ' + str(model.meta['std']))
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
     # TODO: Set Image Size
-    resize = transforms.Resize((320,240), interpolation=2)
+    resize = transforms.Resize((240,320), interpolation=2)
 
     transform = transforms.Compose([
         resize,
@@ -368,10 +368,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
         for q in range(nq):
             if i % 5 == 0:
                 print('GPS INFO: ', gps_info[q])
-                
+                """
                 mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                 std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-                ','.join(gps_info[q][0])
                 url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][0]))
                 # Write Image 
                 img = torch.squeeze(input[q][0])
@@ -380,8 +379,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
                 img = torch.squeeze(input[q][1])
                 img = ((img * std) + mean)
-                #url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(gps_info[q][0]), ','.join(gps_info[q][1]), ','.join(gps_info[q][0]))
-                url = '<a href="google.com/maps/dir/47.358985,8.52384/47.358144,8.524148/@47.3587209,8.5243639,18.67z">Positive Distance</a>'
                 writer.add_image('Positive: {}'.format(url), img, epoch)
 
                 img = torch.squeeze(input[q][2])
@@ -389,6 +386,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 url = "https://www.google.com/maps/dir/{}/{}/@{},14.75z".format(','.join(str(x) for x in gps_info[q][0]), ','.join(str(x) for x in gps_info[q][2]), ','.join(str(x) for x in gps_info[q][0]))
                 print('Negative ',url)
                 writer.add_image('Negative: {}'.format(url), img, epoch)
+                """
+                writer.add_images('my_image_batch', gps_info[q], 0)
 
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
