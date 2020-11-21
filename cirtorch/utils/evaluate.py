@@ -112,7 +112,7 @@ def compute_map(ranks, gnd, kappas=[]):
 
 
 def compute_map_and_print(dataset, ranks, gnd, kappas=[1, 5, 10]):
-    
+    #TODO: Add Mapillary
     # old evaluation protocol
     if dataset.startswith('oxford5k') or dataset.startswith('paris6k'):
         map, aps, _, _ = compute_map(ranks, gnd)

@@ -18,10 +18,21 @@ def cid2filename(cid, prefix):
     """
     return os.path.join(prefix, cid[-2:], cid[-4:-2], cid[-6:-4], cid)
 
+"""
+    def load_image(self, path):
+        try:
+            return self.transform(Image.open(path))
+        except:
+            # just return a black image.
+            return self.transform(Image.fromarray(np.zeros((20,14,3), dtype=np.uint8)))        
+"""
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
-        img = Image.open(f)
+        try:
+            img = Image.open(f)
+        except:
+            img = Image.fromarray(np.zeros((20,14,3), dtype=np.uint8))
         return img.convert('RGB')
 
 def accimage_loader(path):

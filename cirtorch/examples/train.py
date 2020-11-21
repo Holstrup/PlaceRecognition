@@ -17,7 +17,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
@@ -35,7 +35,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive']
 optimizer_names = ['sgd', 'adam']
 writer = SummaryWriter()
 
@@ -78,11 +78,11 @@ parser.add_argument('--whitening', '-w', dest='whitening', action='store_true',
                     help='train model with learnable whitening (linear layer) after the pooling')
 parser.add_argument('--not-pretrained', dest='pretrained', action='store_false',
                     help='initialize model with random weights (default: pretrained on imagenet)')
-parser.add_argument('--loss', '-l', metavar='LOSS', default='contrastive',
+parser.add_argument('--loss', '-l', metavar='LOSS', default='LinearWeightedContrastive',
                     choices=loss_names,
                     help='training loss options: ' +
                         ' | '.join(loss_names) +
-                        ' (default: contrastive)')
+                        ' (default: LinearWeightedContrastive)')
 parser.add_argument('--loss-margin', '-lm', metavar='LM', default=0.7, type=float,
                     help='loss margin: (default: 0.7)')
 
@@ -192,6 +192,8 @@ def main():
     # define loss function (criterion) and optimizer
     if args.loss == 'contrastive':
         criterion = ContrastiveLoss(margin=args.loss_margin).cuda()
+    elif args.loss == 'LinearWeightedContrastive':
+        criterion = LinearWeightedContrastiveLoss(margin=args.loss_margin).cuda()
     elif args.loss == 'triplet':
         criterion = TripletLoss(margin=args.loss_margin).cuda()
     else:
@@ -258,7 +260,6 @@ def main():
     print('MEAN: ' + str(model.meta['mean']))
     print('STD: ' + str(model.meta['std']))
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
-    # TODO: Set Image Size
     resize = transforms.Resize((240,320), interpolation=2)
 
     transform = transforms.Compose([
@@ -310,8 +311,10 @@ def main():
         # adjust learning rate for each epoch
         scheduler.step()
         # # debug printing to check if everything ok
-        # lr_feat = optimizer.param_groups[0]['lr']
-        # lr_pool = optimizer.param_groups[1]['lr']
+        lr_feat = optimizer.param_groups[0]['lr']
+        lr_pool = optimizer.param_groups[1]['lr']
+        writer.add_scalar('LearningRate/Feature', lr_feat, epoch)
+        writer.add_scalar('LearningRate/Pooling', lr_pool, epoch)
         # print('>> Features lr: {:.2e}; Pooling lr: {:.2e}'.format(lr_feat, lr_pool))
 
         # train for one epoch on train set
@@ -366,12 +369,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
         ni = len(input[0]) # number of images per tuple
         
         for q in range(nq):
-            if i % 50 == 0:
-                print('GPS INFO: ', gps_info[q])
-                
+            if i % 5 == 0:
+                mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
+                std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
                 images = input[q][0] * std + mean
                 for image_tensor in input[q][1:]:
-                    torch.stack([images, image_tensor * std + mean], dim=0)
+                    new_image = image_tensor * std + mean
+                    images = torch.cat([images, new_image], dim=0)
                 writer.add_images('ImageBatch{},{}'.format(epoch,i), images, 0)
 
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
@@ -384,7 +388,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
             # then, do backward pass for one tuple only
             # each backward pass gradients will be accumulated
             # the optimization step is performed for the full batch later
-            loss = criterion(output, target[q].cuda())
+            gps_info = torch.tensor(gps_info)
+            if args.loss == 'LinearWeightedContrastive':
+                print(output.size())
+                #TODO: Slice gps_info here
+                loss = criterion(output, target[q].cuda(), gps_info[q])
+            else:
+                loss = criterion(output, target[q].cuda())
             losses.update(loss.item())
             loss.backward()
 
@@ -534,6 +544,7 @@ def test(datasets, net):
         # search, rank, and print
         scores = np.dot(vecs.T, qvecs)
         ranks = np.argsort(-scores, axis=0)
+        #TODO: Recall og mapK
         compute_map_and_print(dataset, ranks, cfg['gnd'])
     
         if Lw is not None:

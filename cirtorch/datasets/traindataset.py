@@ -15,8 +15,8 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-                'train': ["zurich"], #["zurich", "helsinki"],
-                'val': ["zurich"], #['cph'],
+                'train': ["zurich"], #, "cph"], #["zurich", "helsinki"],
+                'val': ["berlin"], #['cph'],
                 'test': ["buenosaires"]
             }
 
@@ -112,11 +112,15 @@ class TuplesDataset(data.Dataset):
             else:
                 self.cities = cities.split(',')
 
+            self.dbImages = []
+            self.qImages = []
+            self.images = []
+            self.qpool = [] # qImages -> qidx
+            self.ppool = [] # dbImages -> pidx
             self.qidxs = [] # qIdx
-            self.qpool = [] # qImages
             self.pidxs = [] # pIdx
             self.nidxs = [] # nonNegIdx
-            self.ppool = [] # dbImages
+            self.clusters = [] # nonNegIdx
             self.sideways = []
             self.night = []
 
@@ -150,8 +154,9 @@ class TuplesDataset(data.Dataset):
                 subdir = 'test' if city in default_cities['test'] else 'train_val'
 
                 # get len of images from cities so far for indexing
-                _lenQ = len(self.qpool)
-                _lenDb = len(self.ppool)
+                #_lenImg = len(self.images)
+                _lenQ = len(self.qImages)
+                _lenDb = len(self.dbImages)
 
                 # when GPS / UTM is available
                 if self.mode in ['train','val']:
@@ -163,7 +168,7 @@ class TuplesDataset(data.Dataset):
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(qDataRaw)
+                    self.addGpsInfo(dbDataRaw)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -195,8 +200,10 @@ class TuplesDataset(data.Dataset):
                     # if a combination of city, task and subtask is chosen, where there are no query/dabase images, then continue to next city
                     if len(unique_qSeqIdx) == 0 or len(unique_dbSeqIdx) == 0: continue
 
-                    self.qpool.extend(qSeqKeys)
-                    self.ppool.extend(dbSeqKeys)
+                    #self.images.extend(qSeqKeys)
+                    #self.images.extend(dbSeqKeys)
+                    self.qImages.extend(qSeqKeys)
+                    self.dbImages.extend(dbSeqKeys)
 
                     qData = qData.loc[unique_qSeqIdx]
                     dbData = dbData.loc[unique_dbSeqIdx]
@@ -231,9 +238,8 @@ class TuplesDataset(data.Dataset):
                         # the query image has at least one positive
                         if len(p_uniq_frame_idxs) > 0:
                             p_seq_idx = np.unique(uniqFrameIdx2seqIdx(unique_dbSeqIdx[p_uniq_frame_idxs], dbSeqIdxs))
-
-                            self.pidxs.append(p_seq_idx + _lenDb)
-                            self.qidxs.append(q_seq_idx + _lenQ)
+                            self.ppool.append(p_seq_idx + _lenDb)
+                            self.qpool.append(q_seq_idx + _lenQ)
 
                             # in training we have two thresholds, one for finding positives and one for finding images that we are certain are negatives.
                             if self.mode == 'train':
@@ -241,11 +247,11 @@ class TuplesDataset(data.Dataset):
                                 n_uniq_frame_idxs = np.unique([n for nonNeg in nI[q_uniq_frame_idx] for n in nonNeg])
                                 n_seq_idx = np.unique(uniqFrameIdx2seqIdx(unique_dbSeqIdx[n_uniq_frame_idxs], dbSeqIdxs))
 
-                                self.nidxs.append(n_seq_idx + _lenDb)
+                                self.clusters.append(n_seq_idx + _lenDb)
 
                                 # gather meta which is useful for positive sampling
-                                if sum(night[np.in1d(index, q_frame_idxs)]) > 0: self.night.append(len(self.qidxs)-1)
-                                if sum(sideways[np.in1d(index, q_frame_idxs)]) > 0: self.sideways.append(len(self.qidxs)-1)
+                                if sum(night[np.in1d(index, q_frame_idxs)]) > 0: self.night.append(len(self.qpool)-1)
+                                if sum(sideways[np.in1d(index, q_frame_idxs)]) > 0: self.sideways.append(len(self.qpool)-1)
 
                         else:
                             query_key = qSeqKeys[q_seq_idx].split('/')[-1][:-4]
@@ -270,26 +276,32 @@ class TuplesDataset(data.Dataset):
                     val_frames = np.where(dbIdx[self.subtask])[0]
                     dbSeqKeys, dbSeqIdxs = self.filter(dbSeqKeys, dbSeqIdxs, val_frames)
 
-                    self.qpool.extend(qSeqKeys)
-                    self.ppool.extend(dbSeqKeys)
+                    #self.images.extend(qSeqKeys)
+                    #self.images.extend(dbSeqKeys)
+                    self.qImages.extend(qSeqKeys)
+                    self.dbImages.extend(dbSeqKeys)
 
-                    # add query index
-                    self.qidxs.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
+                    # add query index TODO: What is this? 
+                    #self.qpool.extend(list(range(_lenImg, len(qSeqKeys) + _lenImg)))
+                    self.qIdx.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
 
             # if a combination of cities, task and subtask is chosen, where there are no query/database images, then exit
-            if len(self.qpool) == 0 or len(self.ppool) == 0:
+            if len(self.dbImages) == 0:
                 print("Exiting...")
                 print("A combination of cities, task and subtask have been chosen, where there are no query/database images.")
                 print("Try choosing a different subtask or more cities")
                 sys.exit()
 
             # creates self.images 
-            self.images = self.qpool + self.ppool #self.qidxs + self.pidxs + self.nidxs
+            #self.images = np.asarray(self.images) #self.qidxs + self.pidxs + self.nidxs
+            self.dbImages = np.asarray(self.dbImages)
+            self.qImages = np.asarray(self.qImages)
 
             # cast to np.arrays for indexing during training
             self.qidxs = np.asarray(self.qidxs)
             self.pidxs = np.asarray(self.pidxs)
             self.nidxs = np.asarray(self.nidxs)
+            self.clusters = np.asarray(self.clusters)
             self.qpool = np.asarray(self.qpool)
             self.ppool = np.asarray(self.ppool)
             self.sideways = np.asarray(self.sideways)
@@ -302,13 +314,13 @@ class TuplesDataset(data.Dataset):
 
             if mode == 'train':
                 # for now always 1-1 lookup.
-                self.negCache = np.asarray([np.empty((0,), dtype=int)]*len(self.qidxs))
+                self.negCache = np.asarray([np.empty((0,), dtype=int)]*len(self.qpool))
 
                 # calculate weights for positive sampling
                 if positive_sampling:
                     self.__calcSamplingWeights__()
                 else:
-                    self.weights = np.ones(len(self.qidxs)) / float(len(self.qidxs))
+                    self.weights = np.ones(len(self.qpool)) / float(len(self.qpool))
             
 
             self.name = name
@@ -317,7 +329,8 @@ class TuplesDataset(data.Dataset):
 
             self.nnum = nnum
             self.qsize = min(qsize, len(self.qpool))
-            self.poolsize = min(poolsize, len(self.images))
+            #self.poolsize = min(poolsize, len(self.images))
+            self.poolsize = min(poolsize, len(self.ppool))
             self.qidxs = None
             self.pidxs = None
             self.nidxs = None
@@ -369,11 +382,12 @@ class TuplesDataset(data.Dataset):
         # initialize weights
         self.weights = np.ones(N)
 
+        #TODO: I get an error here? What does it do exactly? Do I need it? 
         # weight higher if from night or sideways facing
-        if len(self.night) != 0:
-            self.weights[self.night] += N / len(self.night)
-        if len(self.sideways) != 0:
-            self.weights[self.sideways] += N / len(self.sideways)
+        #if len(self.night) != 0:
+        #    self.weights[self.night] += N / len(self.night)
+        #if len(self.sideways) != 0:
+        #    self.weights[self.sideways] += N / len(self.sideways)
 
         # print weight information
         print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
@@ -429,13 +443,14 @@ class TuplesDataset(data.Dataset):
 
         output = []
         # query image
-        output.append(self.loader(self.qidxs[index]))
-        idx = self.qidxs[index].split('/')[-1][:-4]
+        output.append(self.loader(self.qImages[self.qidxs[index]]))
+
         # positive image
-        output.append(self.loader(self.pidxs[index]))
+        output.append(self.loader(self.dbImages[self.pidxs[index]][0])) #TODO: Figure out where the second image comes from
+
         # negative images
         for i in range(len(self.nidxs[index])):
-            output.append(self.loader(self.nidxs[index][i]))
+            output.append(self.loader(self.dbImages[self.nidxs[index][i]]))
 
         if self.imsize is not None:
             output = [imresize(img, self.imsize) for img in output]
@@ -449,12 +464,12 @@ class TuplesDataset(data.Dataset):
 
     def getGpsInformation(self, index):
         gps_info = []
-        qid = self.qidxs[index].split('/')[-1][:-4]
-        pid = self.pidxs[index].split('/')[-1][:-4]
+        qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
+        pid = self.dbImages[self.pidxs[index]][0].split('/')[-1][:-4]
         gps_info.append(self.gpsInfo.get(qid))
         gps_info.append(self.gpsInfo.get(pid))
         for negative in self.nidxs[index]:
-            nid = negative.split('/')[-1][:-4]
+            nid = self.dbImages[negative].split('/')[-1][:-4]
             gps_info.append(self.gpsInfo.get(nid))
         return gps_info
 
@@ -467,7 +482,7 @@ class TuplesDataset(data.Dataset):
     def __repr__(self):
         fmt_str = self.__class__.__name__ + '\n'
         fmt_str += '    Name and mode: {} {}\n'.format(self.name, self.mode)
-        fmt_str += '    Number of images: {}\n'.format(len(self.images))
+        fmt_str += '    Number of images: {}\n'.format(len(self.dbImages))
         fmt_str += '    Number of training tuples: {}\n'.format(len(self.qpool))
         fmt_str += '    Number of negatives per tuple: {}\n'.format(self.nnum)
         fmt_str += '    Number of tuples processed in an epoch: {}\n'.format(self.qsize)
@@ -502,8 +517,7 @@ class TuplesDataset(data.Dataset):
             return 0
 
         # draw poolsize random images for pool of negatives images
-        idxs2images = torch.randperm(len(self.images))[:self.poolsize]
-        
+        idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
 
         # prepare network
         net.cuda()
@@ -522,9 +536,8 @@ class TuplesDataset(data.Dataset):
 
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
-                ImagesFromList(root='', images=self.qidxs, imsize=self.imsize, transform=self.transform),
+                ImagesFromList(root='', images=[self.qImages[i] for i in self.qidxs], imsize=self.imsize, transform=self.transform),
                 **opt)
-            
 
             # extract query vectors
             qvecs = torch.zeros(net.meta['outputdim'], len(self.qidxs)).cuda()
@@ -543,7 +556,7 @@ class TuplesDataset(data.Dataset):
 
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
-                ImagesFromList(root='', images=[self.images[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
+                ImagesFromList(root='', images=[self.dbImages[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
                 **opt
             )
 
@@ -553,7 +566,6 @@ class TuplesDataset(data.Dataset):
                 poolvecs[:, i] = net(input.cuda()).data.squeeze()
                 if (i+1) % self.print_freq == 0 or (i+1) == len(idxs2images):
                     print('\r>>>> {}/{} done...'.format(i+1, len(idxs2images)), end='')
-            print('')
 
             print('>> Searching for hard negatives...')
             # compute dot product scores and ranks on GPU
@@ -563,93 +575,30 @@ class TuplesDataset(data.Dataset):
             n_ndist = torch.tensor(0).float().cuda()  # for statistics
             # selection of negative examples
             self.nidxs = []
+
+            print('Clusters length: ',len(self.clusters))
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
-                qcluster = self.qidxs[q]
-                clusters = [qcluster] #TODO: nonNegQidx
+  
+                qcluster = self.clusters[q]
+                clusters = [qcluster] # -> nonNegQidx
                 nidxs = []
                 r = 0
-                #TODO: How do I use this clusters information? 
+                #TODO: Log positive distance negative distance 
                 while len(nidxs) < self.nnum:
                     potential = idxs2images[ranks[r, q]]
+
                     # take at most one image from the same cluster
-                    # TODO: if potential not in self.nonNegIdx[q]
-                    #if not self.clusters[potential] in clusters:
-                    nidxs.append(self.images[potential])
-                    #    clusters.append(self.clusters[potential])
-                    avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
-                    n_ndist += 1
-                    r += 1
-                self.nidxs.append(nidxs)
-            print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
-            print('>>>> Done')
-
-            """ MSLS
-                    for q in range(len(qidxs)):
-
-            qidx = qidxs[q]
-
-            # find positive idx for this query (cache idx domain)
-            cached_pidx = np.where(np.in1d(pidxs, self.pIdx[qidx]))
-
-            # find idx of positive idx in rank matrix (descending cache idx domain)
-            pidx = np.where(np.in1d(pRanks[q,:], cached_pidx))
-
-            # take the closest positve
-            dPos = pScores[q, pidx][0][0]
-
-            # get distances to all negatives
-            dNeg = nScores[q, :]
-
-            # how much are they violating
-            loss = dPos - dNeg + self.margin ** 0.5
-            violatingNeg = 0 < loss
-
-            # if less than nNeg are violating then skip this query
-            if np.sum(violatingNeg) <= self.nNeg: continue
-
-            # select hardest negatives
-            hardest_negIdx = np.argsort(loss)[:self.nNeg]
-
-            # select the hardest negatives
-            cached_hardestNeg = nRanks[q, hardest_negIdx]
-
-            # select the closest positive (back to cache idx domain)
-            cached_pidx = pRanks[q, pidx][0][0]
-
-            # transform back to original index (back to original idx domain)
-            qidx = self.qIdx[qidx]
-            pidx = pidxs[cached_pidx]
-            hardestNeg = nidxs[cached_hardestNeg]
-
-            # package the triplet and target
-            triplet = [qidx, pidx, *hardestNeg]
-            target = [-1, 1] + [0]*len(hardestNeg)
-
-            self.triplets.append((triplet, target))
-            """
-            
-            """ Old 
-            for q in range(len(self.qidxs)):
-                # do not use query cluster,
-                # those images are potentially positive
-                qcluster = self.clusters[self.qidxs[q]]
-                clusters = [qcluster]
-                nidxs = []
-                r = 0
-                while len(nidxs) < self.nnum:
-                    potential = idxs2images[ranks[r, q]]
-                    # take at most one image from the same cluster
-                    if not self.clusters[potential] in clusters:
+                    #print(self.clusters[potential], ' - In - ', clusters)
+                    #if sum(np.in1d(self.clusters[potential], clusters)) == 0:
+                    if potential not in clusters and potential not in self.pidxs[q]:
                         nidxs.append(potential)
-                        clusters.append(self.clusters[potential])
+                        clusters.append(potential)
                         avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
                         n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
-            """
-
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance

@@ -14,4 +14,8 @@ tensorboard --logdir runs/RUN_ID --bind_all
 ## Datasets left
 #austin  bangkok  berlin  boston  manila  sf  tokyo  toronto
 rsync options source destination
-rsync -r data/train_val/cph/ data/mapillary/train_val/cph/
+rsync -r data/train_val/CITY/ data/mapillary/train_val/CITY/
+rsync -r  data/mapillary/metadata/train_val/CITY/MODE/ data/train/mapillary/train_val/CITY/MODE
+
+## Alias 
+alias train="python3 -m cirtorch.examples.train outputs --training-dataset 'mapillary'"

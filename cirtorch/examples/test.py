@@ -30,7 +30,7 @@ PRETRAINED = {
     'gl18-tl-resnet152-gem-w'           : 'http://cmp.felk.cvut.cz/cnnimageretrieval/data/networks/gl18/gl18-tl-resnet152-gem-w-21278d5.pth',
 }
 
-datasets_names = ['oxford5k', 'paris6k', 'roxford5k', 'rparis6k']
+datasets_names = ['mapillary'] #['oxford5k', 'paris6k', 'roxford5k', 'rparis6k', 'mapillary']
 whitening_names = ['retrieval-SfM-30k', 'retrieval-SfM-120k']
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Testing')
@@ -72,8 +72,8 @@ def main():
 
     # check if test dataset are downloaded
     # and download if they are not
-    download_train(get_data_root())
-    download_test(get_data_root())
+    #download_train(get_data_root())
+    #download_test(get_data_root())
 
     # setting up the visible GPU
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
@@ -247,6 +247,7 @@ def main():
         # search, rank, and print
         scores = np.dot(vecs.T, qvecs)
         ranks = np.argsort(-scores, axis=0)
+        #TODO: Recall og mapK
         compute_map_and_print(dataset, ranks, cfg['gnd'])
     
         if Lw is not None:

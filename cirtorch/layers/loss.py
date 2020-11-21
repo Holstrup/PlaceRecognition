@@ -51,7 +51,7 @@ class LinearWeightedContrastiveLoss(nn.Module):
     """
 
     def __init__(self, margin=0.7, eps=1e-6):
-        super(ContrastiveLoss, self).__init__()
+        super(LinearWeightedContrastiveLoss, self).__init__()
         self.margin = margin
         self.eps = eps
 
