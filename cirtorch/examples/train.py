@@ -17,27 +17,28 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, LogisticallyWeightedContrastiveLoss
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
 from cirtorch.utils.download import download_train, download_test
 from cirtorch.utils.whiten import whitenlearn, whitenapply
-from cirtorch.utils.evaluate import compute_map_and_print
+from cirtorch.utils.evaluate import compute_map_and_print, mapk, recall
 from cirtorch.utils.general import get_data_root, htime
 from torch.utils.tensorboard import SummaryWriter
+from cirtorch.datasets.genericdataset import ImagesFromList
 
-training_dataset_names = ['mapillary'] #[ 'retrieval-SfM-120k']
-test_datasets_names = ['oxford5k', 'paris6k', 'roxford5k', 'rparis6k']
-test_whiten_names = ['retrieval-SfM-30k', 'retrieval-SfM-120k']
+training_dataset_names = ['mapillary']
+test_datasets_names = ['mapillary']
+test_whiten_names = []#['retrieval-SfM-30k', 'retrieval-SfM-120k']
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'LogisticallyWeightedContrastive']
 optimizer_names = ['sgd', 'adam']
-writer = SummaryWriter()
+
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 
@@ -50,15 +51,15 @@ parser.add_argument('--training-dataset', '-d', metavar='DATASET', default='retr
                         ' (default: retrieval-SfM-120k)')
 parser.add_argument('--no-val', dest='val', action='store_false',
                     help='do not run validation')
-parser.add_argument('--test-datasets', '-td', metavar='DATASETS', default='roxford5k,rparis6k',
+parser.add_argument('--test-datasets', '-td', metavar='DATASETS', default='mapillary',
                     help='comma separated list of test datasets: ' + 
                         ' | '.join(test_datasets_names) + 
-                        ' (default: roxford5k,rparis6k)')
+                        ' (default: mapillary)')
 parser.add_argument('--test-whiten', metavar='DATASET', default='', choices=test_whiten_names,
                     help='dataset used to learn whitening for testing: ' + 
                         ' | '.join(test_whiten_names) + 
                         ' (default: None)')
-parser.add_argument('--test-freq', default=1, type=int, metavar='N', 
+parser.add_argument('--test-freq', default=20, type=int, metavar='N', 
                     help='run test evaluation every N epochs (default: 1)')
 
 # network architecture and initialization options
@@ -101,11 +102,11 @@ parser.add_argument('--gpu-id', '-g', default='0', metavar='N',
                     help='gpu id used for training (default: 0)')
 parser.add_argument('--workers', '-j', default=8, type=int, metavar='N',
                     help='number of data loading workers (default: 8)')
-parser.add_argument('--epochs', default=100, type=int, metavar='N',
+parser.add_argument('--epochs', default=1000, type=int, metavar='N',
                     help='number of total epochs to run (default: 100)')
 parser.add_argument('--batch-size', '-b', default=5, type=int, metavar='N', 
                     help='number of (q,p,n1,...,nN) tuples in a mini-batch (default: 5)')
-parser.add_argument('--update-every', '-u', default=1, type=int, metavar='N',
+parser.add_argument('--update-every', '-u', default=5, type=int, metavar='N',
                     help='update model weights every N batches, used to handle really large batches, ' + 
                         'batch_size effectively becomes update_every x batch_size (default: 1)')
 parser.add_argument('--optimizer', '-o', metavar='OPTIMIZER', default='adam',
@@ -127,7 +128,7 @@ parser.add_argument('--resume', default='', type=str, metavar='FILENAME',
 min_loss = float('inf')
 
 def main():
-    global args, min_loss
+    global args, min_loss, writer
     args = parser.parse_args()
 
     # manually check if there are unknown test datasets
@@ -156,6 +157,8 @@ def main():
     directory += "_{}_lr{:.1e}_wd{:.1e}".format(args.optimizer, args.lr, args.weight_decay)
     directory += "_nnum{}_qsize{}_psize{}".format(args.neg_num, args.query_size, args.pool_size)
     directory += "_bsize{}_uevery{}_imsize{}".format(args.batch_size, args.update_every, args.image_size)
+    t = time.strftime("%H:%M:%S", time.localtime())
+    writer = SummaryWriter('data/runs/{}_{}_{}'.format(args.arch, args.loss, t))
 
     args.directory = os.path.join(args.directory, directory)
     print(">> Creating directory if it does not exist:\n>> '{}'".format(args.directory))
@@ -189,11 +192,22 @@ def main():
     # move network to gpu
     model.cuda()
 
+    if 'Weighted' in args.loss:
+        posDistThr=15
+        negDistThr=25
+    else:
+        posDistThr=10
+        negDistThr=25
+        
     # define loss function (criterion) and optimizer
     if args.loss == 'contrastive':
         criterion = ContrastiveLoss(margin=args.loss_margin).cuda()
     elif args.loss == 'LinearWeightedContrastive':
-        criterion = LinearWeightedContrastiveLoss(margin=args.loss_margin).cuda()
+        criterion = LinearWeightedContrastiveLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
+    elif args.loss == 'LinearOverWeightedContrastive':
+        criterion = LinearOverWeightedContrastiveLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
+    elif args.loss == 'LogisticallyWeightedContrastive':
+        criterion = LogisticallyWeightedContrastiveLoss(margin=args.loss_margin).cuda()
     elif args.loss == 'triplet':
         criterion = TripletLoss(margin=args.loss_margin).cuda()
     else:
@@ -267,6 +281,7 @@ def main():
         transforms.ToTensor(),
         normalize,
     ])
+
     train_dataset = TuplesDataset(
         name=args.training_dataset,
         mode='train',
@@ -274,7 +289,9 @@ def main():
         nnum=args.neg_num,
         qsize=args.query_size,
         poolsize=args.pool_size,
-        transform=transform
+        transform=transform,
+        posDistThr=posDistThr,
+        negDistThr=negDistThr
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -289,7 +306,9 @@ def main():
             nnum=args.neg_num,
             qsize=float('Inf'),
             poolsize=float('Inf'),
-            transform=transform
+            transform=transform,
+            posDistThr=negDistThr, # Use 25 meters for both pos and neg
+            negDistThr=negDistThr
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False,
@@ -298,10 +317,16 @@ def main():
         )
 
     # evaluate the network before starting
-    # this might not be necessary?
-    #test(args.test_datasets, model)
+    test(args.test_datasets, model)
 
+    # initialize timers 
+    train_epoch = 0
+    train_time = 0
+    val_time = 0
+    test_time = 0
     for epoch in range(start_epoch, args.epochs):
+        print('> Starting Epoch {}/{}'.format(start_epoch, args.epochs))
+        epoch_start = time.time()
 
         # set manual seeds per epoch
         np.random.seed(epoch)
@@ -316,33 +341,51 @@ def main():
         writer.add_scalar('LearningRate/Feature', lr_feat, epoch)
         writer.add_scalar('LearningRate/Pooling', lr_pool, epoch)
         # print('>> Features lr: {:.2e}; Pooling lr: {:.2e}'.format(lr_feat, lr_pool))
-
+        
         # train for one epoch on train set
+        train_start = time.time()
+        print('>> Training Epoch {}/{}'.format(start_epoch, args.epochs))
         loss = train(train_loader, model, criterion, optimizer, epoch)
+        train_time += time.time() - train_start
         writer.add_scalar('Loss/train', loss, epoch)
+        writer.add_scalar('Timing/CumulativeTraining', train_time, epoch)
 
         # evaluate on validation set
-        if args.val:
+        if args.val and (epoch + 1) % args.test_freq == 0: # Only validate every N epochs s
             with torch.no_grad():
+                print('>> Validation Epoch {}/{}'.format(start_epoch, args.epochs))
+                val_start = time.time()
                 loss = validate(val_loader, model, criterion, epoch)
+                val_time += time.time() - val_start
+                writer.add_scalar('Timing/CumulativeValidation', val_time, epoch)
                 writer.add_scalar('Loss/validation', loss, epoch)
         
         # evaluate on test datasets every test_freq epochs
-        #if (epoch + 1) % args.test_freq == 0:
-        #    with torch.no_grad():
-        #        test(args.test_datasets, model)
+        if (epoch + 1) % args.test_freq == 0:
+            with torch.no_grad():
+                print('>> Test Epoch {}/{}'.format(start_epoch, args.epochs))
+                test_start = time.time()
+                mAP, rec = test(args.test_datasets, model)
+                
+                #TODO: Renaming 
+                # remember best loss and save checkpoint
+                is_best = loss < min_loss
+                min_loss = min(loss, min_loss) # And max
+                save_checkpoint({
+                'epoch': epoch + 1,
+                'meta': model.meta,
+                'state_dict': model.state_dict(),
+                'min_loss': min_loss,
+                'optimizer' : optimizer.state_dict(),
+                }, is_best, args.directory)
+                
+                test_time += time.time() - test_start
+                writer.add_scalar('Timing/CumulativeTest', test_time, epoch)
+                writer.add_scalar('Test/mAP', mAP, epoch)
+                writer.add_scalar('Test/Recall', rec, epoch)
 
-        # remember best loss and save checkpoint
-        is_best = loss < min_loss
-        min_loss = min(loss, min_loss)
-
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'meta': model.meta,
-            'state_dict': model.state_dict(),
-            'min_loss': min_loss,
-            'optimizer' : optimizer.state_dict(),
-        }, is_best, args.directory)
+        train_epoch += time.time() - epoch_start
+        writer.add_scalar('Timing/CumulativeEpoch', train_epoch, epoch)
 
 def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
@@ -350,7 +393,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
 
     # create tuples for training
+    start_time = time.time()
     avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
+    writer.add_scalar('Timing/TrainCreateTuples', time.time() - start_time, epoch)
+    writer.add_scalar('Embeddings/AvgNegDistanceTrain', avg_neg_distance, epoch)
 
     # switch to train mode
     model.train()
@@ -361,22 +407,35 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
     end = time.time()
     for i, (input, target, gps_info) in enumerate(train_loader):
-    #for i, (input, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
+        gps_info = torch.tensor(gps_info)
         
         for q in range(nq):
-            if i % 5 == 0:
-                mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
-                std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-                images = input[q][0] * std + mean
-                for image_tensor in input[q][1:]:
-                    new_image = image_tensor * std + mean
-                    images = torch.cat([images, new_image], dim=0)
-                writer.add_images('ImageBatch{},{}'.format(epoch,i), images, 0)
+            if i % 400 == 0:
+                batchid = 400 * epoch + i 
+
+                # Calculate positive distance
+                dist = distance(gps_info[q][0], gps_info[q][1])
+                writer.add_scalar('GPSDistance/Postive', dist, batchid)
+
+                # Calculate hardest negative distance
+                dist = distance(gps_info[q][0], gps_info[q][2])
+                writer.add_scalar('GPSDistance/HardestNegative', dist, batchid)
+
+                if dist < 50: # meters
+                    mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
+                    std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
+                    images = input[q][0] * std + mean
+
+                    for image_tensor in input[q][1:]:
+                        new_image = image_tensor * std + mean
+                        images = torch.cat([images, new_image], dim=0)
+                    
+                    writer.add_images('ImageBatch: {}'.format(batchid), images, 0)
 
             output = torch.zeros(model.meta['outputdim'], ni).cuda()
             for imi in range(ni):
@@ -388,11 +447,11 @@ def train(train_loader, model, criterion, optimizer, epoch):
             # then, do backward pass for one tuple only
             # each backward pass gradients will be accumulated
             # the optimization step is performed for the full batch later
-            gps_info = torch.tensor(gps_info)
-            if args.loss == 'LinearWeightedContrastive':
-                print(output.size())
-                #TODO: Slice gps_info here
+            if 'Weighted' in args.loss:
                 loss = criterion(output, target[q].cuda(), gps_info[q])
+                if i % 200 == 0:
+                    batchid = 400 * epoch + i 
+                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())
@@ -430,7 +489,10 @@ def validate(val_loader, model, criterion, epoch):
     losses = AverageMeter()
 
     # create tuples for validation
+    start_time = time.time()
     avg_neg_distance = val_loader.dataset.create_epoch_tuples(model)
+    writer.add_scalar('Timing/TrainCreateTuples', time.time() - start_time, epoch)
+    writer.add_scalar('Embeddings/AvgNegDistanceValidation', avg_neg_distance, epoch)
 
     # switch to evaluate mode
     model.eval()
@@ -447,9 +509,11 @@ def validate(val_loader, model, criterion, epoch):
 
                 # compute output vector for image imi of query q
                 output[:, q*ni + imi] = model(input[q][imi].cuda()).squeeze()
-
+            
         # no need to reduce memory consumption (no backward pass):
         # compute loss for the full batch
+        #TODO: Fix loss func to be able to take a batch - For now using contrastive loss
+        # gps_info = torch.tensor(gps_info)
         loss = criterion(output, torch.cat(target).cuda())
 
         # record loss
@@ -475,46 +539,38 @@ def test(datasets, net):
     # for testing we use image size of max 1024
     image_size = 1024
 
+    posDistThr = 25
+    negDistThr = 25
+
     # moving network to gpu and eval mode
     net.cuda()
     net.eval()
     # set up the transform
+    resize = transforms.Resize((240,320), interpolation=2)
     normalize = transforms.Normalize(
         mean=net.meta['mean'],
         std=net.meta['std']
     )
     transform = transforms.Compose([
+        resize,
         transforms.ToTensor(),
         normalize
     ])
+    imsize = args.image_size
+    test_dataset = TuplesDataset(
+        name=args.training_dataset,
+        mode='val', # Test on validation set during training
+        imsize=imsize,
+        nnum=args.neg_num,
+        qsize=args.query_size,
+        poolsize=args.pool_size,
+        transform=transform,
+        posDistThr=posDistThr,
+        negDistThr=negDistThr
+    )
+    qidxs, pidxs = test_dataset.get_loaders()
 
-    # compute whitening
-    if args.test_whiten:
-        start = time.time()
-
-        print('>> {}: Learning whitening...'.format(args.test_whiten))
-
-        # loading db
-        db_root = os.path.join(get_data_root(), 'train', args.test_whiten)
-        ims_root = os.path.join(db_root, 'ims')
-        db_fn = os.path.join(db_root, '{}-whiten.pkl'.format(args.test_whiten))
-        with open(db_fn, 'rb') as f:
-            db = pickle.load(f)
-        images = [cid2filename(db['cids'][i], ims_root) for i in range(len(db['cids']))]
-
-        # extract whitening vectors
-        print('>> {}: Extracting...'.format(args.test_whiten))
-        wvecs = extract_vectors(net, images, image_size, transform)  # implemented with torch.no_grad
-        
-        # learning whitening 
-        print('>> {}: Learning...'.format(args.test_whiten))
-        wvecs = wvecs.numpy()
-        m, P = whitenlearn(wvecs, db['qidxs'], db['pidxs'])
-        Lw = {'m': m, 'P': P}
-
-        print('>> {}: elapsed time: {}'.format(args.test_whiten, htime(time.time()-start)))
-    else:
-        Lw = None
+    opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
     # evaluate on test datasets
     datasets = args.test_datasets.split(',')
@@ -522,43 +578,41 @@ def test(datasets, net):
         start = time.time()
 
         print('>> {}: Extracting...'.format(dataset))
-
-        # prepare config structure for the test dataset
-        cfg = configdataset(dataset, os.path.join(get_data_root(), 'test'))
-        images = [cfg['im_fname'](cfg,i) for i in range(cfg['n'])]
-        qimages = [cfg['qim_fname'](cfg,i) for i in range(cfg['nq'])]
-        bbxs = [tuple(cfg['gnd'][i]['bbx']) for i in range(cfg['nq'])]
         
-        # extract database and query vectors
-        print('>> {}: database images...'.format(dataset))
-        vecs = extract_vectors(net, images, image_size, transform)  # implemented with torch.no_grad
-        print('>> {}: query images...'.format(dataset))
-        qvecs = extract_vectors(net, qimages, image_size, transform, bbxs)  # implemented with torch.no_grad
-        
-        print('>> {}: Evaluating...'.format(dataset))
+        # Step 1: Extract Database Images - dbLoader
+        print('>> {}: Extracting Database Images...'.format(dataset))
+        dbLoader = torch.utils.data.DataLoader(
+            ImagesFromList(root='', images=[test_dataset.dbImages[i] for i in range(len(test_dataset.dbImages))], imsize=imsize, transform=transform),
+            **opt)        
+        poolvecs = torch.zeros(net.meta['outputdim'], len(test_dataset.dbImages)).cuda()
+        for i, input in enumerate(dbLoader):
+            poolvecs[:, i] = net(input.cuda()).data.squeeze()
 
-        # convert to numpy
-        vecs = vecs.numpy()
-        qvecs = qvecs.numpy()
+        # Step 2: Extract Query Images - qLoader
+        print('>> {}: Extracting Query Images...'.format(dataset))
+        qLoader = torch.utils.data.DataLoader(
+                ImagesFromList(root='', images=[test_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
+                **opt)
 
-        # search, rank, and print
-        scores = np.dot(vecs.T, qvecs)
-        ranks = np.argsort(-scores, axis=0)
-        #TODO: Recall og mapK
-        compute_map_and_print(dataset, ranks, cfg['gnd'])
-    
-        if Lw is not None:
-            # whiten the vectors
-            vecs_lw  = whitenapply(vecs, Lw['m'], Lw['P'])
-            qvecs_lw = whitenapply(qvecs, Lw['m'], Lw['P'])
+        qvecs = torch.zeros(net.meta['outputdim'], len(qidxs)).cuda()
+        for i, input in enumerate(qLoader):
+            qvecs[:, i] = net(input.cuda()).data.squeeze()
 
-            # search, rank, and print
-            scores = np.dot(vecs_lw.T, qvecs_lw)
-            ranks = np.argsort(-scores, axis=0)
-            compute_map_and_print(dataset + ' + whiten', ranks, cfg['gnd'])
-        
+        # Step 3: Ranks 
+        scores = torch.mm(poolvecs.t(), qvecs)
+        scores, ranks = torch.sort(scores, dim=0, descending=True) #Dim1? 
+        ranks = ranks.cpu().numpy()
+        ranks = np.transpose(ranks)
+
+        print('>> {}: Computing Recall and Map'.format(dataset))
+        k = 5
+        ks = [5]
+        mean_ap = mapk(ranks, pidxs, k)
+        rec = recall(ranks, pidxs, ks)
+
+        print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
-
+        return mean_ap, rec
 
 def save_checkpoint(state, is_best, directory):
     filename = os.path.join(directory, 'model_epoch%d.pth.tar' % state['epoch'])
@@ -566,7 +620,19 @@ def save_checkpoint(state, is_best, directory):
     if is_best:
         filename_best = os.path.join(directory, 'model_best.pth.tar')
         shutil.copyfile(filename, filename_best)
+"""
+def distance(query, positive):
+    lon1, lat1 = positive[0], positive[1]
+    lon0, lat0 = query[0], query[1]
 
+    deglen = 110250
+    x = lat1 - lat0
+    y = (lon1 - lon0)*torch.cos(lat0)
+    test = torch.pow(x,2) + torch.pow(y,2)
+    return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
+"""
+def distance(query, positive):
+    return np.linalg.norm(np.array(query)-np.array(positive))
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

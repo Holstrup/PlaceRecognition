@@ -15,10 +15,12 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-                'train': ["zurich"], #, "cph"], #["zurich", "helsinki"],
-                'val': ["berlin"], #['cph'],
-                'test': ["buenosaires"]
-            }
+    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
+              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'val': ["cph", "sf"],
+    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
+}
 
 class TuplesDataset(data.Dataset):
     """Data loader that loads training and validation tuples of 
@@ -50,52 +52,18 @@ class TuplesDataset(data.Dataset):
             ie new q-p pairs are picked and negative images are remined
     """
 
-    def __init__(self, name, mode, imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader):
+    def __init__(self, name, mode='train', imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader, posDistThr=10, negDistThr=25):
 
-        if not (mode == 'train' or mode == 'val'):
-            raise(RuntimeError("MODE should be either train or val, passed as string"))
-
-        if name.startswith('retrieval-SfM'):
-            # setting up paths
-            data_root = get_data_root()
-            db_root = os.path.join(data_root, 'train', name)
-            ims_root = os.path.join(db_root, 'ims')
-    
-            # loading db
-            db_fn = os.path.join(db_root, '{}.pkl'.format(name))
-            with open(db_fn, 'rb') as f:
-                db = pickle.load(f)[mode]
-    
-            # setting fullpath for images
-            self.images = [cid2filename(db['cids'][i], ims_root) for i in range(len(db['cids']))]
-
-        elif name.startswith('gl'):
-
-            # setting up paths
-            db_root = '/mnt/fry2/users/datasets/landmarkscvprw18/recognition/'
-            ims_root = os.path.join(db_root, 'images', 'train')
-    
-            # loading db
-            db_fn = os.path.join(db_root, '{}.pkl'.format(name))
-            with open(db_fn, 'rb') as f:
-                db = pickle.load(f)[mode]
-    
-            # setting fullpath for images
-            self.images = [os.path.join(ims_root, db['cids'][i]+'.jpg') for i in range(len(db['cids']))]
-        elif name.startswith('mapillary'):
+        if name.startswith('mapillary'):
             # Parameters 
-            root_dir = 'data/mapillary' #get_data_root()
+            root_dir = 'data' 
             cities = ''
-            nNeg = 5
-            #transform = None
-            mode = 'train'
+            nNeg = nnum
             task = 'im2im'
             subtask = 'all'
             seq_length = 1
-            posDistThr = 10
-            negDistThr = 25
-            cached_queries = 1000
-            cached_negatives = 1000
+            #cached_queries = 1000
+            #cached_negatives = 1000
             positive_sampling = True
 
             # initializing
@@ -129,8 +97,6 @@ class TuplesDataset(data.Dataset):
             self.margin = 0.1
             self.posDistThr = posDistThr
             self.negDistThr = negDistThr
-            self.cached_queries = cached_queries
-            self.cached_negatives = cached_negatives
 
             # flags
             self.cache = None
@@ -159,11 +125,11 @@ class TuplesDataset(data.Dataset):
                 _lenDb = len(self.dbImages)
 
                 # when GPS / UTM is available
-                if self.mode in ['train','val']:
+                if self.mode in ['train','val','test']:
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(qDataRaw)
+                    self.addGpsInfo(qData)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
@@ -175,7 +141,7 @@ class TuplesDataset(data.Dataset):
                     dbSeqKeys, dbSeqIdxs = self.arange_as_seq(dbData, join(root_dir, subdir, city, 'database'), seq_length_db)
 
                     # filter based on subtasks
-                    if self.mode in ['val']:
+                    if self.mode in ['val', 'test']:
                         qidxs = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
                         dbIdx = pd.read_csv(join(root_dir, subdir, city, 'database', 'subtask_index.csv'), index_col = 0)
 
@@ -200,8 +166,6 @@ class TuplesDataset(data.Dataset):
                     # if a combination of city, task and subtask is chosen, where there are no query/dabase images, then continue to next city
                     if len(unique_qSeqIdx) == 0 or len(unique_dbSeqIdx) == 0: continue
 
-                    #self.images.extend(qSeqKeys)
-                    #self.images.extend(dbSeqKeys)
                     self.qImages.extend(qSeqKeys)
                     self.dbImages.extend(dbSeqKeys)
 
@@ -258,7 +222,7 @@ class TuplesDataset(data.Dataset):
                             self.query_keys_with_no_match.append(query_key)
         
                 # when GPS / UTM / pano info is not available    
-                elif self.mode in ['test']:
+                elif self.mode in ['test2']:
 
                     # load images for subtask
                     qidxs = pd.read_csv(join(root_dir, subdir, city, 'query', 'subtask_index.csv'), index_col = 0)
@@ -276,14 +240,10 @@ class TuplesDataset(data.Dataset):
                     val_frames = np.where(dbIdx[self.subtask])[0]
                     dbSeqKeys, dbSeqIdxs = self.filter(dbSeqKeys, dbSeqIdxs, val_frames)
 
-                    #self.images.extend(qSeqKeys)
-                    #self.images.extend(dbSeqKeys)
                     self.qImages.extend(qSeqKeys)
                     self.dbImages.extend(dbSeqKeys)
 
-                    # add query index TODO: What is this? 
-                    #self.qpool.extend(list(range(_lenImg, len(qSeqKeys) + _lenImg)))
-                    self.qIdx.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
+                    self.qpool.extend(list(range(_lenQ, len(qSeqKeys) + _lenQ)))
 
             # if a combination of cities, task and subtask is chosen, where there are no query/database images, then exit
             if len(self.dbImages) == 0:
@@ -329,7 +289,6 @@ class TuplesDataset(data.Dataset):
 
             self.nnum = nnum
             self.qsize = min(qsize, len(self.qpool))
-            #self.poolsize = min(poolsize, len(self.images))
             self.poolsize = min(poolsize, len(self.ppool))
             self.qidxs = None
             self.pidxs = None
@@ -371,9 +330,20 @@ class TuplesDataset(data.Dataset):
 
             self.print_freq = 10
 
+    def get_loaders(self):
+        ## ------------------------
+        ## SELECTING POSITIVE PAIRS
+        ## ------------------------
+
+        # draw qsize random queries for tuples
+        idxs2qpool = torch.randperm(len(self.qpool))
+        self.qidxs = [self.qpool[i] for i in range(len(self.qpool))]
+        self.pidxs = [self.ppool[i] for i in range(len(self.ppool))]
+        return self.qidxs, self.pidxs
+
     def addGpsInfo(self, dataframe):
         for index, row in dataframe.iterrows():
-            self.gpsInfo[row['key']] = [row['lat'], row['lon']]
+            self.gpsInfo[row['key']] = [row['easting'], row['northing']]
 
     def __calcSamplingWeights__(self):
         # length of query
@@ -446,7 +416,7 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.qImages[self.qidxs[index]]))
 
         # positive image
-        output.append(self.loader(self.dbImages[self.pidxs[index]][0])) #TODO: Figure out where the second image comes from
+        output.append(self.loader(self.dbImages[self.pidxs[index]][0]))
 
         # negative images
         for i in range(len(self.nidxs[index])):
@@ -527,13 +497,6 @@ class TuplesDataset(data.Dataset):
         with torch.no_grad():
 
             print('>> Extracting descriptors for query images...')
-            
-            # prepare query loader
-            #loader = torch.utils.data.DataLoader(
-            #    ImagesFromList(root='', images=[self.images[i] for i in self.qidxs], imsize=self.imsize, transform=self.transform),
-            #    batch_size=1, shuffle=False, num_workers=8, pin_memory=True
-            #)
-
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
                 ImagesFromList(root='', images=[self.qImages[i] for i in self.qidxs], imsize=self.imsize, transform=self.transform),
@@ -546,14 +509,9 @@ class TuplesDataset(data.Dataset):
                 if (i+1) % self.print_freq == 0 or (i+1) == len(self.qidxs):
                     print('\r>>>> {}/{} done...'.format(i+1, len(self.qidxs)), end='')
 
-            print('>> Extracting descriptors for negative pool...')
+            
             # prepare negative pool data loader
-            #opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
-            #loader = torch.utils.data.DataLoader(
-            #    ImagesFromList(root='', images=[self.images[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
-            #    **opt
-            #)
-
+            print('>> Extracting descriptors for negative pool...')
             opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
             loader = torch.utils.data.DataLoader(
                 ImagesFromList(root='', images=[self.dbImages[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
@@ -576,25 +534,24 @@ class TuplesDataset(data.Dataset):
             # selection of negative examples
             self.nidxs = []
 
-            print('Clusters length: ',len(self.clusters))
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
-  
-                qcluster = self.clusters[q]
-                clusters = [qcluster] # -> nonNegQidx
+
+                if self.mode == 'train':
+                    clusters = self.clusters[q] #nonNegQidx
+                else:
+                    clusters = []
                 nidxs = []
                 r = 0
-                #TODO: Log positive distance negative distance 
+        
                 while len(nidxs) < self.nnum:
-                    potential = idxs2images[ranks[r, q]]
+                    potential = int(idxs2images[ranks[r, q]])
 
                     # take at most one image from the same cluster
-                    #print(self.clusters[potential], ' - In - ', clusters)
-                    #if sum(np.in1d(self.clusters[potential], clusters)) == 0:
-                    if potential not in clusters and potential not in self.pidxs[q]:
+                    if (potential not in clusters) and (potential not in self.pidxs[q]):
                         nidxs.append(potential)
-                        clusters.append(potential)
+                        clusters = np.append(clusters, np.array(potential))
                         avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
                         n_ndist += 1
                     r += 1

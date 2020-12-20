@@ -112,7 +112,6 @@ def compute_map(ranks, gnd, kappas=[]):
 
 
 def compute_map_and_print(dataset, ranks, gnd, kappas=[1, 5, 10]):
-    #TODO: Add Mapillary
     # old evaluation protocol
     if dataset.startswith('oxford5k') or dataset.startswith('paris6k'):
         map, aps, _, _ = compute_map(ranks, gnd)
@@ -147,3 +146,45 @@ def compute_map_and_print(dataset, ranks, gnd, kappas=[1, 5, 10]):
 
         print('>> {}: mAP E: {}, M: {}, H: {}'.format(dataset, np.around(mapE*100, decimals=2), np.around(mapM*100, decimals=2), np.around(mapH*100, decimals=2)))
         print('>> {}: mP@k{} E: {}, M: {}, H: {}'.format(dataset, kappas, np.around(mprE*100, decimals=2), np.around(mprM*100, decimals=2), np.around(mprH*100, decimals=2)))
+
+"""
+def recall(ranks, pidxs, qidxs, ks):
+    recall_at_k = np.zeros(len(ks))
+    for qidx in range(ranks.shape[1]):
+        for i, k in enumerate(ks):
+            if np.sum(np.in1d(ranks[:k, qidx], pidxs[qidx])) > 0:
+                recall_at_k[i:] += 1
+                break
+    recall_at_k /= ranks.shape[0]
+    return recall_at_k
+"""
+def recall(ranks, pidx, ks):
+
+	recall_at_k = np.zeros(len(ks))
+	for qidx in range(ranks.shape[0]):
+
+		for i, k in enumerate(ks):
+			if np.sum(np.in1d(ranks[qidx,:k], pidx[qidx])) > 0:
+				recall_at_k[i:] += 1
+				break
+
+	recall_at_k /= ranks.shape[0]
+
+	return recall_at_k
+
+def apk(pidx, rank, k):
+    if len(rank)>k:
+        rank = rank[:k]
+
+    score = 0.0
+    num_hits = 0.0
+
+    for i,p in enumerate(rank):
+        if p in pidx and p not in rank[:i]:
+            num_hits += 1.0
+            score += num_hits / (i+1.0)
+
+    return score / min(len(pidx), k)
+
+def mapk(ranks, pidxs, k):
+    return np.mean([apk(a,p,k) for a,p in zip(pidxs, ranks)])

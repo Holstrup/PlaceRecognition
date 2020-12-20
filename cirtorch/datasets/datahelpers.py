@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+import numpy as np
 
 import torch
 
@@ -28,11 +29,13 @@ def cid2filename(cid, prefix):
 """
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-    with open(path, 'rb') as f:
-        try:
+    try:
+        with open(path, 'rb') as f:
             img = Image.open(f)
-        except:
-            img = Image.fromarray(np.zeros((20,14,3), dtype=np.uint8))
+            return img.convert('RGB')
+    except:
+        print("Black Image Used for path: ", path)
+        img = Image.fromarray(np.zeros((20,14,3), dtype=np.uint8))
         return img.convert('RGB')
 
 def accimage_loader(path):
@@ -62,7 +65,6 @@ def flip(x, dim):
     return x.view(xsize)
 
 def collate_tuples(batch):
-    #TODO: Make it not throw gps info away
     if len(batch) == 1:
         return [batch[0][0]], [batch[0][1]], [batch[0][2]]
     return [batch[i][0] for i in range(len(batch))], [batch[i][1] for i in range(len(batch))], [batch[i][2] for i in range(len(batch))]

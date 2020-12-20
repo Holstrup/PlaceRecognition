@@ -4,6 +4,7 @@ import pdb
 import torch
 import torch.nn.functional as F
 from math import radians, cos, sin, asin, sqrt
+import numpy as np
 
 # --------------------------------------
 # pooling
@@ -18,7 +19,6 @@ def spoc(x):
     return F.avg_pool2d(x, (x.size(-2), x.size(-1)))
     # return F.adaptive_avg_pool2d(x, (1,1)) # alternative
 
-# TODO: Was p not a parameter we learn? 
 def gem(x, p=3, eps=1e-6):
     return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1./p)
     # return F.lp_pool2d(F.threshold(x, eps, eps), p, (x.size(-2), x.size(-1))) # alternative
@@ -157,12 +157,12 @@ def contrastive_loss(x, label, margin=0.7, eps=1e-6):
     y = torch.sum(y)
     return y
 
-def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
+def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
     # x is D x N
     dim = x.size(0) # D
     nq = torch.sum(label.data==-1) # number of tuples
     S = x.size(1) // nq # number of images per tuple including query: 1+1+n
-    #TODO: What's going on here? 
+    
     x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
     idx = [i for i in range(len(label)) if label.data[i] != -1]
     x2 = x[:, idx]
@@ -171,11 +171,54 @@ def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     
-    print(gps.size())
-    print(gps)
+    weighting = 1
+    if len(gps) > 0:
+        dist = torch.cdist(gps[0], gps[1], p=2)
+        weighting = torch.max(1 - torch.div(dist,gpsmargin), torch.tensor([0.])) # Safety precaution. Should not happen.  
+    
+    y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y, weighting
+
+def linear_over_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+    
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
+    weighting = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+        weighting = max(2 - torch.div(2*dist, gpsmargin), 0) # Safety precaution. Should not happen.  
+    
+    y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y, weighting
+
+def logistically_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
     dist = distance(gps[0], gps[1])
-    weighting = 1 - torch.div(dist,25) 
-    print(dist, weighting)
+    weighting = torch.div(1, 1 + torch.exp(dist - 15))
     
     y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
@@ -193,6 +236,20 @@ def distance(query, positive):
     test = torch.pow(x,2) + torch.pow(y,2)
     return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
 
+
+"""    
+def distance(query, positive):
+    lon1, lat1 = positive[0], positive[1]
+    lon0, lat0 = query[0], query[1]
+
+    deglen = 110250
+    x = lat1 - lat0
+    y = (lon1 - lon0)*torch.cos(lat0)
+    test = torch.pow(x,2) + torch.pow(y,2)
+    return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
+"""
+def distance(query, positive):
+    return np.linalg.norm(np.array(query)-np.array(positive))
 
 def triplet_loss(x, label, margin=0.1):
     # x is D x N
