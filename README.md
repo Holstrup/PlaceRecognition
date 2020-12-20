@@ -1,5 +1,3 @@
-TODO
-
 ## HPC Connect
 ssh USERNAME@login2.hpc.dtu.dk
 

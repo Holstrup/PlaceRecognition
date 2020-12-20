@@ -4,6 +4,7 @@ import numpy as np
 
 import torch
 
+
 def cid2filename(cid, prefix):
     """
     Creates a training image path out of its CID name
@@ -19,14 +20,6 @@ def cid2filename(cid, prefix):
     """
     return os.path.join(prefix, cid[-2:], cid[-4:-2], cid[-6:-4], cid)
 
-"""
-    def load_image(self, path):
-        try:
-            return self.transform(Image.open(path))
-        except:
-            # just return a black image.
-            return self.transform(Image.fromarray(np.zeros((20,14,3), dtype=np.uint8)))        
-"""
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     try:
@@ -35,8 +28,9 @@ def pil_loader(path):
             return img.convert('RGB')
     except:
         print("Black Image Used for path: ", path)
-        img = Image.fromarray(np.zeros((20,14,3), dtype=np.uint8))
+        img = Image.fromarray(np.zeros((20, 14, 3), dtype=np.uint8))
         return img.convert('RGB')
+
 
 def accimage_loader(path):
     import accimage
@@ -46,6 +40,7 @@ def accimage_loader(path):
         # Potentially a decoding problem, fall back to PIL.Image
         return pil_loader(path)
 
+
 def default_loader(path):
     from torchvision import get_image_backend
     if get_image_backend() == 'accimage':
@@ -53,16 +48,20 @@ def default_loader(path):
     else:
         return pil_loader(path)
 
+
 def imresize(img, imsize):
     img.thumbnail((imsize, imsize), Image.ANTIALIAS)
     return img
+
 
 def flip(x, dim):
     xsize = x.size()
     dim = x.dim() + dim if dim < 0 else dim
     x = x.view(-1, *xsize[dim:])
-    x = x.view(x.size(0), x.size(1), -1)[:, getattr(torch.arange(x.size(1)-1, -1, -1), ('cpu','cuda')[x.is_cuda])().long(), :]
+    x = x.view(x.size(0), x.size(1), -1)[:, getattr(torch.arange(
+        x.size(1)-1, -1, -1), ('cpu', 'cuda')[x.is_cuda])().long(), :]
     return x.view(xsize)
+
 
 def collate_tuples(batch):
     if len(batch) == 1:
