@@ -52,18 +52,13 @@ class TuplesDataset(data.Dataset):
             ie new q-p pairs are picked and negative images are remined
     """
 
-    def __init__(self, name, mode='train', imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader, posDistThr=10, negDistThr=25):
+    def __init__(self, name, mode='train', imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader, posDistThr=10, negDistThr=25, root_dir = 'data', cities = ''):
 
         if name.startswith('mapillary'):
-            # Parameters 
-            root_dir = 'data' 
-            cities = ''
-            nNeg = nnum
+            # Parameters  
             task = 'im2im'
-            subtask = 'all'
             seq_length = 1
-            #cached_queries = 1000
-            #cached_negatives = 1000
+            subtask = 'all'
             positive_sampling = True
 
             # initializing
@@ -79,6 +74,8 @@ class TuplesDataset(data.Dataset):
                 self.cities = default_cities[mode]
             else:
                 self.cities = cities.split(',')
+            
+            nNeg = nnum
 
             self.dbImages = []
             self.qImages = []
@@ -331,10 +328,6 @@ class TuplesDataset(data.Dataset):
             self.print_freq = 10
 
     def get_loaders(self):
-        ## ------------------------
-        ## SELECTING POSITIVE PAIRS
-        ## ------------------------
-
         # draw qsize random queries for tuples
         idxs2qpool = torch.randperm(len(self.qpool))
         self.qidxs = [self.qpool[i] for i in range(len(self.qpool))]
@@ -537,13 +530,11 @@ class TuplesDataset(data.Dataset):
             for q in range(len(self.qidxs)):
                 # do not use query cluster,
                 # those images are potentially positive
-
-                if self.mode == 'train':
-                    clusters = self.clusters[q] #nonNegQidx
-                else:
-                    clusters = []
                 nidxs = []
+                clusters = []
                 r = 0
+                if self.mode == 'train':
+                    clusters = self.clusters[q]
         
                 while len(nidxs) < self.nnum:
                     potential = int(idxs2images[ranks[r, q]])

@@ -88,8 +88,8 @@ parser.add_argument('--loss-margin', '-lm', metavar='LM', default=0.7, type=floa
                     help='loss margin: (default: 0.7)')
 
 # train/val options specific for image retrieval learning
-parser.add_argument('--image-size', default=1024, type=int, metavar='N',
-                    help='maximum size of longer image side used for training (default: 1024)')
+parser.add_argument('--image-size', default=320, type=int, metavar='N',
+                    help='maximum size of longer image side used for training (default: 320)')
 parser.add_argument('--neg-num', '-nn', default=5, type=int, metavar='N',
                     help='number of negative image per train/val tuple (default: 5)')
 parser.add_argument('--query-size', '-qs', default=2000, type=int, metavar='N',
@@ -269,12 +269,14 @@ def main():
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=exp_decay, last_epoch=checkpoint['epoch']-1)
         else:
             print(">> No checkpoint found at '{}'".format(args.resume))
-
+    
     # Data loading code
     print('MEAN: ' + str(model.meta['mean']))
     print('STD: ' + str(model.meta['std']))
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
-    resize = transforms.Resize((240,320), interpolation=2)
+    imsize = args.image_size
+    #resize = transforms.Resize((240,320), interpolation=2)
+    resize = transforms.Resize((imsize * 4/3, imsize), interpolation=2)
 
     transform = transforms.Compose([
         resize,
@@ -285,13 +287,15 @@ def main():
     train_dataset = TuplesDataset(
         name=args.training_dataset,
         mode='train',
-        imsize=args.image_size,
+        imsize=imsize,
         nnum=args.neg_num,
         qsize=args.query_size,
         poolsize=args.pool_size,
         transform=transform,
         posDistThr=posDistThr,
-        negDistThr=negDistThr
+        negDistThr=negDistThr, 
+        root_dir = 'data',
+        cities=''
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -302,13 +306,15 @@ def main():
         val_dataset = TuplesDataset(
             name=args.training_dataset,
             mode='val',
-            imsize=args.image_size,
+            imsize=imsize,
             nnum=args.neg_num,
             qsize=float('Inf'),
             poolsize=float('Inf'),
             transform=transform,
             posDistThr=negDistThr, # Use 25 meters for both pos and neg
-            negDistThr=negDistThr
+            negDistThr=negDistThr,
+            root_dir = 'data',
+            cities=''
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False,
@@ -566,7 +572,9 @@ def test(datasets, net):
         poolsize=args.pool_size,
         transform=transform,
         posDistThr=posDistThr,
-        negDistThr=negDistThr
+        negDistThr=negDistThr,
+        root_dir = 'data',
+        cities=''
     )
     qidxs, pidxs = test_dataset.get_loaders()
 
@@ -620,17 +628,7 @@ def save_checkpoint(state, is_best, directory):
     if is_best:
         filename_best = os.path.join(directory, 'model_best.pth.tar')
         shutil.copyfile(filename, filename_best)
-"""
-def distance(query, positive):
-    lon1, lat1 = positive[0], positive[1]
-    lon0, lat0 = query[0], query[1]
 
-    deglen = 110250
-    x = lat1 - lat0
-    y = (lon1 - lon0)*torch.cos(lat0)
-    test = torch.pow(x,2) + torch.pow(y,2)
-    return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
-"""
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
 
