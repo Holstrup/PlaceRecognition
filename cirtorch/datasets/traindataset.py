@@ -453,6 +453,9 @@ class TuplesDataset(data.Dataset):
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         return fmt_str
+    
+    def distance(self, query, positive):
+        return np.linalg.norm(np.array(query)-np.array(positive))
 
     def create_epoch_tuples(self, net):
 
@@ -540,7 +543,12 @@ class TuplesDataset(data.Dataset):
                     potential = int(idxs2images[ranks[r, q]])
 
                     # take at most one image from the same cluster
+                    print(self.qImages(self.qidxs[q]))
+                    q_coor = self.gpsInfo(self.qImages(self.qidxs[q])[64:-4])
                     if (potential not in clusters) and (potential not in self.pidxs[q]):
+                        print('>>', self.dbImages(potential))
+                        n_coor = self.gpsInfo(self.dbImages(potential)[67:-4])
+                        print('>> Dist: ', distance(q_coor, n_coor))
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))
                         avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
