@@ -530,32 +530,26 @@ class TuplesDataset(data.Dataset):
             # selection of negative examples
             self.nidxs = []
 
-            for i, q in enumerate(self.qidxs):
-                # do not use query cluster,
-                # those images are potentially positive
+            for q in range(len(self.qidxs)):
+                # do not use query cluster, those images are potentially positive
                 nidxs = []
                 clusters = []
                 r = 0
                 if self.mode == 'train':
-                    clusters = self.clusters[idxs2qpool[i]]
-                    #for idx in clusters:
-                    #    print(self.qImages[q], self.dbImages[idx])
+                    clusters = self.clusters[idxs2qpool[q]]
                  
                 while len(nidxs) < self.nnum:
-                    potential = int(idxs2images[ranks[r, idxs2qpool[i]]])
+                    potential = int(idxs2images[ranks[r, idxs2qpool[q]]])
 
                     # take at most one image from the same cluster
-                    q_coor = self.gpsInfo[self.qImages[self.qpool[i]][-26:-4]]
-                    if (potential not in clusters) and (potential not in self.pidxs[i]):
-                        n_coor = self.gpsInfo[self.dbImages[potential][-26:-4]]   
-                        print('>> Dist: ', self.distance(q_coor, n_coor))
+                    if (potential not in clusters) and (potential not in self.pidxs[q]):
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))
-                        avg_ndist += torch.pow(qvecs[:,i]-poolvecs[:,ranks[r, i]]+1e-6, 2).sum(dim=0).sqrt()
+                        avg_ndist += torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
                         n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
                 
-            #print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
+            print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
