@@ -275,8 +275,8 @@ def main():
     print('STD: ' + str(model.meta['std']))
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
     imsize = args.image_size
-    #resize = transforms.Resize((240,320), interpolation=2)
-    resize = transforms.Resize((imsize * 3/4, imsize), interpolation=2)
+    resize = transforms.Resize((240,320), interpolation=2)
+    #resize = transforms.Resize((imsize * 3/4, imsize), interpolation=2)
 
     transform = transforms.Compose([
         resize,
@@ -323,7 +323,7 @@ def main():
         )
 
     # evaluate the network before starting
-    test(args.test_datasets, model)
+    # test(args.test_datasets, model)
 
     # initialize timers 
     train_epoch = 0
