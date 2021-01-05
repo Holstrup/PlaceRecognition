@@ -138,7 +138,7 @@ def main():
 
     # check if test dataset are downloaded
     # and download if they are not
-    download_train(get_data_root())
+    #download_train(get_data_root())
     #download_test(get_data_root())
 
     # create export dir if it doesnt exist
@@ -276,7 +276,7 @@ def main():
     normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
     imsize = args.image_size
     #resize = transforms.Resize((240,320), interpolation=2)
-    resize = transforms.Resize((imsize * 4/3, imsize), interpolation=2)
+    resize = transforms.Resize((imsize * 3/4, imsize), interpolation=2)
 
     transform = transforms.Compose([
         resize,

@@ -131,7 +131,7 @@ class TuplesDataset(data.Dataset):
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(dbDataRaw)
+                    self.addGpsInfo(dbData)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -530,7 +530,7 @@ class TuplesDataset(data.Dataset):
             # selection of negative examples
             self.nidxs = []
 
-            for q in range(len(self.qidxs)):
+            for q in self.qidxs:
                 # do not use query cluster,
                 # those images are potentially positive
                 nidxs = []
@@ -543,11 +543,11 @@ class TuplesDataset(data.Dataset):
                     potential = int(idxs2images[ranks[r, q]])
 
                     # take at most one image from the same cluster
-                    print(self.qImages(self.qidxs[q]))
-                    q_coor = self.gpsInfo(self.qImages(self.qidxs[q])[64:-4])
+                    print(self.qImages[self.qidxs[q]])
+                    q_coor = self.gpsInfo[self.qImages[self.qidxs[q]][-26:-4]]
                     if (potential not in clusters) and (potential not in self.pidxs[q]):
                         print('>>', self.dbImages(potential))
-                        n_coor = self.gpsInfo(self.dbImages(potential)[67:-4])
+                        n_coor = self.gpsInfo[self.dbImages[potential][-26:-4]]   
                         print('>> Dist: ', distance(q_coor, n_coor))
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))
