@@ -15,11 +15,11 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["zurich"], #, "london", "boston", "melbourne", "amsterdam","helsinki",
-              #"tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
-              #"budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
+              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
-    'test': ["miami"] #,"athens","buenosaires","stockholm","bengaluru","kampala"]
+    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
 }
 
 class TuplesDataset(data.Dataset):
@@ -471,7 +471,6 @@ class TuplesDataset(data.Dataset):
         idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
         self.qidxs = [self.qpool[i] for i in idxs2qpool]
         self.pidxs = [self.ppool[i] for i in idxs2qpool]
-        print('>>', len(self.qidxs), len(self.clusters), self.qidxs[0:100:10])
         ## ------------------------
         ## SELECTING NEGATIVE PAIRS
         ## ------------------------
