@@ -15,7 +15,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
+    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
               "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
               "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
@@ -344,7 +344,7 @@ class TuplesDataset(data.Dataset):
 
         # initialize weights
         self.weights = np.ones(N)
-        
+
         # weight higher if from night or sideways facing
         if len(self.night) != 0:
             self.weights[self.night] += N / len(self.night)
