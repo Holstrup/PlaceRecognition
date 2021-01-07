@@ -408,7 +408,7 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.qImages[self.qidxs[index]]))
 
         # positive image
-        output.append(self.loader(self.dbImages[self.pidxs[index]][0]))
+        output.append(self.loader(self.dbImages[self.pidxs[index]][0])) #TODO: Sample with some prob. distribution 
 
         # negative images
         for i in range(len(self.nidxs[index])):
@@ -551,3 +551,63 @@ class TuplesDataset(data.Dataset):
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
+
+
+        def create_epoch_tuples2(self, net):
+            print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
+            print(">>>> used network: ")
+            print(net.meta_repr())
+
+            ## ------------------------
+            ## SELECTING POSITIVE PAIRS
+            ## ------------------------
+
+            # draw qsize random queries for tuples
+            idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
+            self.qidxs = [self.qpool[i] for i in idxs2qpool]
+            self.pidxs = [self.ppool[i] for i in idxs2qpool]
+
+            ## ------------------------
+            ## SELECTING NEGATIVE PAIRS
+            ## ------------------------
+
+            # if nnum = 0 create dummy nidxs
+            # useful when only positives used for training
+            if self.nnum == 0:
+                self.nidxs = [[] for _ in range(len(self.qidxs))]
+                return 0
+
+            # draw poolsize random images for pool of negatives images
+            idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
+            print(self.qImages[i][-26:])
+            querycoordinates = [gpsInfo[self.qImages[i][-26:]] for i in idxs2qpool]
+            poolcoordinates = [gpsInfo[self.dbImages[i][-26:]] for i in idxs2images]
+
+            distances = np.zeros((self.poolsize, self.qsize))
+
+            #TODO: Compute distance matrix - Sort in ascending order
+            for i, qcoor in enumerate(querycoordinates):
+                for j, pcoor in enumerate(poolcoordinates):
+                    distances[j,i] = self.distance(qcoor, pcoor)
+
+            # selection of negative examples
+            self.nidxs = []
+
+            for q in range(len(self.qidxs)):
+                # do not use query cluster, those images are potentially positive
+                nidxs = []
+                clusters = []
+                r = 0
+                if self.mode == 'train':
+                    clusters = self.clusters[idxs2qpool[q]]
+                    
+                while len(nidxs) < self.nnum:
+                    potential = int(idxs2images[distances[r, idxs2qpool[q]]])
+
+                    # take at most one image from the same cluster
+                    if (potential not in clusters) and (potential not in self.pidxs[q]):
+                        nidxs.append(potential)
+                        clusters = np.append(clusters, np.array(potential))
+                        n_ndist += 1
+                    r += 1
+                self.nidxs.append(nidxs)
