@@ -344,13 +344,12 @@ class TuplesDataset(data.Dataset):
 
         # initialize weights
         self.weights = np.ones(N)
-
-        #TODO: I get an error here? What does it do exactly? Do I need it? 
+        
         # weight higher if from night or sideways facing
-        #if len(self.night) != 0:
-        #    self.weights[self.night] += N / len(self.night)
-        #if len(self.sideways) != 0:
-        #    self.weights[self.sideways] += N / len(self.sideways)
+        if len(self.night) != 0:
+            self.weights[self.night] += N / len(self.night)
+        if len(self.sideways) != 0:
+            self.weights[self.sideways] += N / len(self.sideways)
 
         # print weight information
         print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
