@@ -131,7 +131,7 @@ class TuplesDataset(data.Dataset):
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(dbDataRaw)
+                    self.addGpsInfo(dbData)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -345,12 +345,11 @@ class TuplesDataset(data.Dataset):
         # initialize weights
         self.weights = np.ones(N)
 
-        #TODO: I get an error here? What does it do exactly? Do I need it? 
         # weight higher if from night or sideways facing
-        #if len(self.night) != 0:
-        #    self.weights[self.night] += N / len(self.night)
-        #if len(self.sideways) != 0:
-        #    self.weights[self.sideways] += N / len(self.sideways)
+        if len(self.night) != 0:
+            self.weights[self.night] += N / len(self.night)
+        if len(self.sideways) != 0:
+            self.weights[self.sideways] += N / len(self.sideways)
 
         # print weight information
         print("#Sideways [{}/{}]; #Night; [{}/{}]".format(len(self.sideways), N, len(self.night), N))
@@ -453,6 +452,9 @@ class TuplesDataset(data.Dataset):
         tmp = '    Transforms (if any): '
         fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         return fmt_str
+    
+    def distance(self, query, positive):
+        return np.linalg.norm(np.array(query)-np.array(positive))
 
     def create_epoch_tuples(self, net):
 
@@ -468,7 +470,6 @@ class TuplesDataset(data.Dataset):
         idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
         self.qidxs = [self.qpool[i] for i in idxs2qpool]
         self.pidxs = [self.ppool[i] for i in idxs2qpool]
-
         ## ------------------------
         ## SELECTING NEGATIVE PAIRS
         ## ------------------------
@@ -528,16 +529,15 @@ class TuplesDataset(data.Dataset):
             self.nidxs = []
 
             for q in range(len(self.qidxs)):
-                # do not use query cluster,
-                # those images are potentially positive
+                # do not use query cluster, those images are potentially positive
                 nidxs = []
                 clusters = []
                 r = 0
                 if self.mode == 'train':
-                    clusters = self.clusters[q]
-        
+                    clusters = self.clusters[idxs2qpool[q]]
+                 
                 while len(nidxs) < self.nnum:
-                    potential = int(idxs2images[ranks[r, q]])
+                    potential = int(idxs2images[ranks[r, idxs2qpool[q]]])
 
                     # take at most one image from the same cluster
                     if (potential not in clusters) and (potential not in self.pidxs[q]):
@@ -547,6 +547,7 @@ class TuplesDataset(data.Dataset):
                         n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
+                
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
