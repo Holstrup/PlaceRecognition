@@ -15,11 +15,11 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["zurich"],# "london", "boston", "melbourne", "amsterdam","helsinki",
-              #"tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
-              #"budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
+              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
-    'test': ["miami"] #,"athens","buenosaires","stockholm","bengaluru","kampala"]
+    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
 }
 
 class TuplesDataset(data.Dataset):
@@ -458,12 +458,11 @@ class TuplesDataset(data.Dataset):
         return np.linalg.norm(np.array(query)-np.array(positive))
 
     def create_epoch_tuples(self, net):
-        self.tuple_mining = 'default'
         
         if self.tuple_mining == 'default':
-            return epoch_tuples_standard(net)
+            return self.epoch_tuples_standard(net)
         else:
-            return epoch_tuples_gps(net)
+            return self.epoch_tuples_gps(net)
 
 
     def epoch_tuples_standard(self, net):
@@ -565,8 +564,6 @@ class TuplesDataset(data.Dataset):
 
     def epoch_tuples_gps(self, net):
             print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
-            print(">>>> used network: ")
-            print(net.meta_repr())
 
             # draw qsize random queries for tuples
             idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
@@ -627,4 +624,4 @@ class TuplesDataset(data.Dataset):
                         n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
-            return 0
+            return (avg_ndist/n_ndist).item() # return average negative gps distance
