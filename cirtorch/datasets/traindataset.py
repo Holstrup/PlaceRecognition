@@ -105,6 +105,7 @@ class TuplesDataset(data.Dataset):
             self.transform = transform
             self.query_keys_with_no_match = []
             self.gpsInfo = {}
+            self.tuple_mining = 'default'
 
             # define sequence length based on task
             if task == 'im2im':
@@ -456,7 +457,16 @@ class TuplesDataset(data.Dataset):
     def distance(self, query, positive):
         return np.linalg.norm(np.array(query)-np.array(positive))
 
-    def create_epoch_tuples2(self, net):
+    def create_epoch_tuples(self, net):
+        self.tuple_mining = 'default'
+        
+        if self.tuple_mining == 'default':
+            return epoch_tuples_standard(net)
+        else:
+            return epoch_tuples_gps(net)
+
+
+    def epoch_tuples_standard(self, net):
 
         print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
         print(">>>> used network: ")
@@ -553,17 +563,20 @@ class TuplesDataset(data.Dataset):
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
 
 
-    def create_epoch_tuples(self, net):
+    def epoch_tuples_gps(self, net):
             print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
             print(">>>> used network: ")
             print(net.meta_repr())
+
+            # draw qsize random queries for tuples
+            idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
+            # draw poolsize random images for pool of negatives images
+            idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
 
             ## ------------------------
             ## SELECTING POSITIVE PAIRS
             ## ------------------------
 
-            # draw qsize random queries for tuples
-            idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
             self.qidxs = [self.qpool[i] for i in idxs2qpool]
             self.pidxs = [self.ppool[i] for i in idxs2qpool]
 
@@ -577,39 +590,41 @@ class TuplesDataset(data.Dataset):
                 self.nidxs = [[] for _ in range(len(self.qidxs))]
                 return 0
 
-            # draw poolsize random images for pool of negatives images
-            idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
             querycoordinates = [self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool]
             poolcoordinates = [self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images]
 
             distances = torch.zeros((self.poolsize, self.qsize))
 
-            #TODO: Compute distance matrix - Sort in ascending order
+            #TODO: This needs to be done another way (Matrix computations)
             for i, qcoor in enumerate(querycoordinates):
                 for j, pcoor in enumerate(poolcoordinates):
                     distances[j,i] = self.distance(qcoor, pcoor)
-            #distances = torch.from_numpy(distances)
-            distances, ranks = torch.sort(distances, dim=0, descending=False)
-            print(distances[0:5,0:5], ranks[0:5,0:5])
+            distances, indicies = torch.sort(distances, dim=0, descending=False)
+            
             # selection of negative examples
             self.nidxs = []
 
-            for q in range(len(self.qidxs)):
-                # do not use query cluster, those images are potentially positive
-                nidxs = []
-                clusters = []
-                r = 0
-                if self.mode == 'train':
-                    clusters = self.clusters[idxs2qpool[q]]
-                    
-                while len(nidxs) < self.nnum:
-                    print(idxs2images[ranks[r:r+3, q]], distances[r:r+3, q])
-                    potential = int(idxs2images[ranks[r, q]]) #TODO: Note that this will choose the same negatives every time (assuming the samples are the same)
+            # Statistics
+            avg_ndist = torch.tensor(0).float().cuda()  # for statistics
+            n_ndist = torch.tensor(0).float().cuda()  # for statistics
 
-                    # take at most one image from the same cluster
-                    if (potential not in clusters) and (potential not in self.pidxs[q]):
+            for q in range(len(self.qidxs)):
+                nidxs = []
+                r = 0
+                while len(nidxs) < self.nnum:
+                    #TODO: This will choose the same negatives every time (assuming the samples are the same)
+                    # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
+                    potential = idxs2images[indicies[r, q]] 
+                    
+                    #TODO: Do we still need the cluster information? 
+                    # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
+                    # clusters = self.clusters[idxs2qpool[q]]
+                    
+                    if distances[r, q] >= self.negDistThr:
                         nidxs.append(potential)
-                        clusters = np.append(clusters, np.array(potential))
+                        # clusters = np.append(clusters, np.array(potential))
+                        avg_ndist += distances[r, q]
+                        n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
             return 0
