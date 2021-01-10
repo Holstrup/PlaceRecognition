@@ -587,17 +587,16 @@ class TuplesDataset(data.Dataset):
                 self.nidxs = [[] for _ in range(len(self.qidxs))]
                 return 0
 
-            querycoordinates = [self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool]
-            poolcoordinates = [self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images]
+            # get query and pool coordinates
+            querycoordinates = torch.tensor([self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool], dtype=torch.float)
+            poolcoordinates = torch.tensor([self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images], dtype=torch.float)
 
-            distances = torch.zeros((self.poolsize, self.qsize))
-
-            #TODO: This needs to be done another way (Matrix computations)
-            for i, qcoor in enumerate(querycoordinates):
-                for j, pcoor in enumerate(poolcoordinates):
-                    distances[j,i] = self.distance(qcoor, pcoor)
-            distances, indicies = torch.sort(distances, dim=0, descending=False)
+            # compute distances
+            distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
             
+            # sort distances
+            distances, indicies = torch.sort(distances, dim=1, descending=False)
+
             # selection of negative examples
             self.nidxs = []
 
@@ -611,7 +610,7 @@ class TuplesDataset(data.Dataset):
                 while len(nidxs) < self.nnum:
                     #TODO: This will choose the same negatives every time (assuming the samples are the same)
                     # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
-                    potential = idxs2images[indicies[r, q]] 
+                    potential = idxs2images[indicies[q, r]] 
                     
                     #TODO: Do we still need the cluster information? 
                     # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
@@ -620,7 +619,7 @@ class TuplesDataset(data.Dataset):
                     if distances[r, q] >= self.negDistThr:
                         nidxs.append(potential)
                         # clusters = np.append(clusters, np.array(potential))
-                        avg_ndist += distances[r, q]
+                        avg_ndist += distances[q, r]
                         n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
