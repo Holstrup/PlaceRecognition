@@ -15,11 +15,11 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
-              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
-              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'train': ["zurich"],# "london", "boston", "melbourne", "amsterdam","helsinki",
+              #"tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              #"budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
-    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
+    'test': ["miami"] #,"athens","buenosaires","stockholm","bengaluru","kampala"]
 }
 
 class TuplesDataset(data.Dataset):
@@ -456,7 +456,7 @@ class TuplesDataset(data.Dataset):
     def distance(self, query, positive):
         return np.linalg.norm(np.array(query)-np.array(positive))
 
-    def create_epoch_tuples(self, net):
+    def create_epoch_tuples2(self, net):
 
         print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
         print(">>>> used network: ")
@@ -553,7 +553,7 @@ class TuplesDataset(data.Dataset):
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
 
 
-        def create_epoch_tuples2(self, net):
+    def create_epoch_tuples(self, net):
             print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
             print(">>>> used network: ")
             print(net.meta_repr())
@@ -579,17 +579,18 @@ class TuplesDataset(data.Dataset):
 
             # draw poolsize random images for pool of negatives images
             idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
-            print(self.qImages[i][-26:])
-            querycoordinates = [gpsInfo[self.qImages[i][-26:]] for i in idxs2qpool]
-            poolcoordinates = [gpsInfo[self.dbImages[i][-26:]] for i in idxs2images]
+            querycoordinates = [self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool]
+            poolcoordinates = [self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images]
 
-            distances = np.zeros((self.poolsize, self.qsize))
+            distances = torch.zeros((self.poolsize, self.qsize))
 
             #TODO: Compute distance matrix - Sort in ascending order
             for i, qcoor in enumerate(querycoordinates):
                 for j, pcoor in enumerate(poolcoordinates):
                     distances[j,i] = self.distance(qcoor, pcoor)
-
+            #distances = torch.from_numpy(distances)
+            distances, ranks = torch.sort(distances, dim=0, descending=False)
+            print(distances[0:5,0:5], ranks[0:5,0:5])
             # selection of negative examples
             self.nidxs = []
 
@@ -602,12 +603,13 @@ class TuplesDataset(data.Dataset):
                     clusters = self.clusters[idxs2qpool[q]]
                     
                 while len(nidxs) < self.nnum:
-                    potential = int(idxs2images[distances[r, idxs2qpool[q]]])
+                    print(idxs2images[ranks[r:r+3, q]], distances[r:r+3, q])
+                    potential = int(idxs2images[ranks[r, q]]) #TODO: Note that this will choose the same negatives every time (assuming the samples are the same)
 
                     # take at most one image from the same cluster
                     if (potential not in clusters) and (potential not in self.pidxs[q]):
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))
-                        n_ndist += 1
                     r += 1
                 self.nidxs.append(nidxs)
+            return 0
