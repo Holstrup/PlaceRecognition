@@ -322,7 +322,7 @@ def main():
         )
 
     # evaluate the network before starting
-    test(args.test_datasets, model)
+    #test(args.test_datasets, model)
 
     # initialize timers 
     train_epoch = 0

@@ -15,7 +15,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["trondheim", "london", "boston", "melbourne", "amsterdam","helsinki",
+    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
               "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
               "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
@@ -105,6 +105,7 @@ class TuplesDataset(data.Dataset):
             self.transform = transform
             self.query_keys_with_no_match = []
             self.gpsInfo = {}
+            self.tuple_mining = 'default'
 
             # define sequence length based on task
             if task == 'im2im':
@@ -408,7 +409,7 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.qImages[self.qidxs[index]]))
 
         # positive image
-        output.append(self.loader(self.dbImages[self.pidxs[index]][0]))
+        output.append(self.loader(self.dbImages[self.pidxs[index]][0])) #TODO: Sample with some prob. distribution 
 
         # negative images
         for i in range(len(self.nidxs[index])):
@@ -457,6 +458,14 @@ class TuplesDataset(data.Dataset):
         return np.linalg.norm(np.array(query)-np.array(positive))
 
     def create_epoch_tuples(self, net):
+        
+        if self.tuple_mining == 'default':
+            return self.epoch_tuples_standard(net)
+        else:
+            return self.epoch_tuples_gps(net)
+
+
+    def epoch_tuples_standard(self, net):
 
         print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
         print(">>>> used network: ")
@@ -551,3 +560,67 @@ class TuplesDataset(data.Dataset):
             print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
             print('>>>> Done')
         return (avg_ndist/n_ndist).item()  # return average negative l2-distance
+
+
+    def epoch_tuples_gps(self, net):
+            print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
+
+            # draw qsize random queries for tuples
+            idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
+            # draw poolsize random images for pool of negatives images
+            idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
+
+            ## ------------------------
+            ## SELECTING POSITIVE PAIRS
+            ## ------------------------
+
+            self.qidxs = [self.qpool[i] for i in idxs2qpool]
+            self.pidxs = [self.ppool[i] for i in idxs2qpool]
+
+            ## ------------------------
+            ## SELECTING NEGATIVE PAIRS
+            ## ------------------------
+
+            # if nnum = 0 create dummy nidxs
+            # useful when only positives used for training
+            if self.nnum == 0:
+                self.nidxs = [[] for _ in range(len(self.qidxs))]
+                return 0
+
+            # get query and pool coordinates
+            querycoordinates = torch.tensor([self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool], dtype=torch.float)
+            poolcoordinates = torch.tensor([self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images], dtype=torch.float)
+
+            # compute distances
+            distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
+            
+            # sort distances
+            distances, indicies = torch.sort(distances, dim=1, descending=False)
+
+            # selection of negative examples
+            self.nidxs = []
+
+            # Statistics
+            avg_ndist = torch.tensor(0).float().cuda()  # for statistics
+            n_ndist = torch.tensor(0).float().cuda()  # for statistics
+
+            for q in range(len(self.qidxs)):
+                nidxs = []
+                r = 0
+                while len(nidxs) < self.nnum:
+                    #TODO: This will choose the same negatives every time (assuming the samples are the same)
+                    # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
+                    potential = idxs2images[indicies[q, r]] 
+                    
+                    #TODO: Do we still need the cluster information? 
+                    # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
+                    # clusters = self.clusters[idxs2qpool[q]]
+                    
+                    if distances[r, q] >= self.negDistThr:
+                        nidxs.append(potential)
+                        # clusters = np.append(clusters, np.array(potential))
+                        avg_ndist += distances[q, r]
+                        n_ndist += 1
+                    r += 1
+                self.nidxs.append(nidxs)
+            return (avg_ndist/n_ndist).item() # return average negative gps distance
