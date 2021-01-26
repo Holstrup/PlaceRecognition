@@ -157,6 +157,28 @@ def contrastive_loss(x, label, margin=0.7, eps=1e-6):
     y = torch.sum(y)
     return y
 
+def regression_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
+    dist = torch.cdist(gps[0], gps[1], p=2)
+    peak_scaling = margin / gpsmargin * dist
+
+    y = 0.5*lbl*torch.pow((D-peak_scaling),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y
+
+
 def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
     # x is D x N
     dim = x.size(0) # D
@@ -223,31 +245,7 @@ def logistically_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
     y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
-    
-def distance(query, positive):
-    #lon1, lat1 = positive[:, 0], positive[:, 1]
-    #lon0, lat0 = query[:, 0], query[:, 1]
-    lon1, lat1 = positive[0], positive[1]
-    lon0, lat0 = query[0], query[1]
 
-    deglen = 110250
-    x = lat1 - lat0
-    y = (lon1 - lon0)*torch.cos(lat0)
-    test = torch.pow(x,2) + torch.pow(y,2)
-    return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
-
-
-"""    
-def distance(query, positive):
-    lon1, lat1 = positive[0], positive[1]
-    lon0, lat0 = query[0], query[1]
-
-    deglen = 110250
-    x = lat1 - lat0
-    y = (lon1 - lon0)*torch.cos(lat0)
-    test = torch.pow(x,2) + torch.pow(y,2)
-    return deglen * torch.sqrt(torch.pow(x,2) + torch.pow(y,2))
-"""
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
 
