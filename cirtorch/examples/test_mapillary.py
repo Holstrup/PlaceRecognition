@@ -59,6 +59,8 @@ parser.add_argument('--whitening', '-w', metavar='WHITENING', default=None, choi
                     help="dataset used to learn whitening for testing: " + 
                         " | ".join(whitening_names) + 
                         " (default: None)")
+parser.add_argument('--generate-plot', default=False, type=bool, metavar='PLOT',
+                    help='Generates a plot over embedding distance and geographical distance')
 
 # GPU ID
 parser.add_argument('--gpu-id', '-g', default='0', metavar='N',
@@ -197,8 +199,19 @@ def main():
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
         scores, ranks = torch.sort(scores, dim=0, descending=True) #Dim1? 
+        
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
+
+        scores = scores.cpu().numpy()
+        scores = np.transpose(scores)
+
+        if args.generate_plot:
+            print('>>> {}: Generating Plot'.format(dataset))
+            gpsinfo = test_dataset.gpsInfo
+            k = 5
+            for qidx in range(ranks.shape[0]):
+                points = ranks[qidx,:k]
 
         print('>> {}: Computing Recall and Map'.format(dataset))
         k = 5
