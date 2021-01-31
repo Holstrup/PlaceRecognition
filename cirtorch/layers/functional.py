@@ -171,12 +171,12 @@ def regression_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=1
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     
-    dist = torch.cdist(gps[0], gps[1], p=2)
+    dist = distance(gps[0], gps[1])
     peak_scaling = margin / gpsmargin * dist
 
     y = 0.5*lbl*torch.pow((D-peak_scaling),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
-    return y
+    return y, peak_scaling
 
 
 def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
