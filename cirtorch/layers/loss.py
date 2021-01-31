@@ -140,14 +140,15 @@ class RegressionContrastiveLoss(nn.Module):
     """
 
     def __init__(self, margin=0.7, eps=1e-6, gpsmargin=15):
-        super(LinearOverWeightedContrastiveLoss, self).__init__()
+        super(RegressionContrastiveLoss, self).__init__()
         self.margin = margin
         self.eps = eps
         self.weighting = 0
         self.gpsmargin = gpsmargin
 
     def forward(self, x, label, gps=[]):
-        loss, weighting =LF.regression_contrastive_loss(x, label, gps, margin=self.margin, eps=self.eps)
+        # loss, weighting = LF.linear_weighted_contrastive_loss(x, label, gps, margin=self.margin, eps=self.eps)
+        loss, weighting = LF.regression_contrastive_loss(x, label, gps, margin=self.margin, eps=self.eps)
         self.weighting = weighting
         return loss
 
