@@ -212,6 +212,10 @@ def main():
             k = 5
             for qidx in range(ranks.shape[0]):
                 points = ranks[qidx,:k]
+                q = test_dataset.qImages[qidx].split('/')[-1][:-4]
+                ps = [test_dataset.dbImages[i].split('/')[-1][:-4] for i in points]
+                print(q, ps)
+                break
 
         print('>> {}: Computing Recall and Map'.format(dataset))
         k = 5
