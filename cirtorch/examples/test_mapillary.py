@@ -59,6 +59,8 @@ parser.add_argument('--whitening', '-w', metavar='WHITENING', default=None, choi
                     help="dataset used to learn whitening for testing: " + 
                         " | ".join(whitening_names) + 
                         " (default: None)")
+parser.add_argument('--generate-plot', default=False, type=bool, metavar='PLOT',
+                    help='Generates a plot over embedding distance and geographical distance')
 
 # GPU ID
 parser.add_argument('--gpu-id', '-g', default='0', metavar='N',
@@ -196,10 +198,37 @@ def main():
 
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
-        scores, ranks = torch.sort(scores, dim=0, descending=True) #Dim1? 
+        scores, ranks = torch.sort(scores, dim=0, descending=True) # Euclidan distance is 1 - Score 
+        
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
 
+        scores = scores.cpu().numpy()
+        scores = np.transpose(scores)
+
+        if args.generate_plot:
+            print('>>> {}: Generating Plot'.format(dataset))
+            gpsinfo = test_dataset.gpsInfo
+            k = 5
+            gpsdistances = np.zeros((ranks.shape[0], k))
+            embeddingdistances = np.zeros((ranks.shape[0],k))
+            for qidx in range(ranks.shape[0]):
+                points = ranks[qidx,:k]
+                q = test_dataset.qImages[qidx].split('/')[-1][:-4]
+                qcoor = gpsinfo[q]
+                ps = [test_dataset.dbImages[i].split('/')[-1][:-4] for i in points]
+                for i in range(len(ps)):
+                    ps[i] = distance(qcoor, gpsinfo[ps[i]])
+                #print(gpsinfo[q], gpsinfo[ps[0]])i
+                #embeddingdistances[qidx] = np.array(scores[qidx,:k])
+                ps = np.array(ps)
+                embed = np.array(scores[qidx,:k])
+                gpsdistances[qidx,:] = ps
+                embeddingdistances[qidx,:] = embed
+                #print(q, ps, embed)
+            print(gpsdistances)
+            np.savetxt("gps.csv", gpsdistances, delimiter=",")
+            np.savetxt("embedding.csv", embeddingdistances, delimiter=",")
         print('>> {}: Computing Recall and Map'.format(dataset))
         k = 5
         ks = [1, 5, 10]
@@ -210,6 +239,8 @@ def main():
         print('>> mAP 5: {}'.format(mean_ap))
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
+def distance(query, positive):
+    return np.linalg.norm(np.array(query)-np.array(positive))
 
 if __name__ == '__main__':
     main()

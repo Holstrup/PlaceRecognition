@@ -16,7 +16,7 @@ from cirtorch.utils.general import get_data_root
 
 default_cities = {
     'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
-              "tokyo","toronto","saopaulo","moscow","zurich","paris","bangkok",
+              "tokyo","toronto","saopaulo","moscow","trondheim","paris","bangkok",
               "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
     'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
@@ -345,7 +345,7 @@ class TuplesDataset(data.Dataset):
 
         # initialize weights
         self.weights = np.ones(N)
-
+        """
         # weight higher if from night or sideways facing
         if len(self.night) != 0:
             self.weights[self.night] += N / len(self.night)
@@ -361,6 +361,7 @@ class TuplesDataset(data.Dataset):
             print("Sideways and Day weighted with {:.4f}".format( 1 + N/len(self.sideways)))
         if len(self.sideways) != 0 and len(self.night) != 0:
             print("Sideways and Night weighted with {:.4f}".format(1 + N/len(self.night) + N/len(self.sideways)))
+        """
 
     def filter(self, seqKeys, seqIdxs, center_frame_condition):
         keys, idxs = [], []
@@ -546,8 +547,7 @@ class TuplesDataset(data.Dataset):
                     clusters = self.clusters[idxs2qpool[q]]
                  
                 while len(nidxs) < self.nnum:
-                    potential = int(idxs2images[ranks[r, idxs2qpool[q]]])
-
+                    potential = int(idxs2images[ranks[r, q]])
                     # take at most one image from the same cluster
                     if (potential not in clusters) and (potential not in self.pidxs[q]):
                         nidxs.append(potential)

@@ -36,7 +36,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'LogisticallyWeightedContrastive']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', ]
 optimizer_names = ['sgd', 'adam']
 
 
@@ -629,7 +629,7 @@ def save_checkpoint(state, is_best, directory):
         shutil.copyfile(filename, filename_best)
 
 def distance(query, positive):
-    return np.linalg.norm(np.array(query)-np.array(positive))
+    return torch.norm(torch.tensor(query)-torch.tensor(positive))
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
