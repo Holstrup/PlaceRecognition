@@ -195,9 +195,9 @@ def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmar
     
     weighting = 1
     if len(gps) > 0:
-        dist = torch.cdist(gps[0], gps[1], p=2)
+        dist = distance(gps[0], gps[1])
         weighting = torch.max(1 - torch.div(dist,gpsmargin), torch.tensor([0.])) # Safety precaution. Should not happen.  
-    
+    weighting = weighting.cuda()
     y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y, weighting
@@ -242,12 +242,15 @@ def logistically_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
     dist = distance(gps[0], gps[1])
     weighting = torch.div(1, 1 + torch.exp(dist - 15))
     
-    y = 0.5*lbl*torch.pow(D,2)*weighting + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = 0.5*lbl*torch.pow(D,2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
 def distance(query, positive):
-    return np.linalg.norm(np.array(query)-np.array(positive))
+    q = torch.tensor(query)
+    p = torch.tensor(positive)
+    print(p, q)
+    return torch.norm(q-p)
 
 def triplet_loss(x, label, margin=0.1):
     # x is D x N
