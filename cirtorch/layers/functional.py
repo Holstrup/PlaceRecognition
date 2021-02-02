@@ -171,14 +171,16 @@ def regression_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=1
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     
-    dist = distance(gps[0], gps[1])
-    peak_scaling = margin / gpsmargin * dist
+    peak_scaling = 0
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+        peak_scaling = margin / gpsmargin * dist
 
     y = 4*lbl*torch.pow((D-peak_scaling),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y, peak_scaling
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=2):
     # x is D x N
     dim = x.size(0) # D
     nq = torch.sum(label.data==-1) # number of tuples
@@ -191,12 +193,14 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
 
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
-    dist = distance(gps[0], gps[1])
 
-    torch.log(a)
+    dist = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+    print(label, dist, gps)
 
-
-    y = 0.5*lbl*torch.pow((D),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
+    y = -math.log(1/sigma) - normal.log_prob((dist-D)/sigma)*lbl - torch.log(normal.cdf((D - gpsmargin)/sigma)) * (1-lbl)
     y = torch.sum(y)
     return y
 

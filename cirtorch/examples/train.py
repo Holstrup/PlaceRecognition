@@ -17,7 +17,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, LogisticallyWeightedContrastiveLoss, RegressionContrastiveLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
@@ -36,7 +36,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', ]
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitLoss']
 optimizer_names = ['sgd', 'adam']
 
 
@@ -210,6 +210,8 @@ def main():
         criterion = RegressionContrastiveLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     elif args.loss == 'triplet':
         criterion = TripletLoss(margin=args.loss_margin).cuda()
+    elif args.loss == 'LogTobitLoss':
+        criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
 
