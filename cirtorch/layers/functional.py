@@ -180,7 +180,7 @@ def regression_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=1
     y = torch.sum(y)
     return y, peak_scaling
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=2):
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1/2):
     # x is D x N
     dim = x.size(0) # D
     nq = torch.sum(label.data==-1) # number of tuples
@@ -198,9 +198,12 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=2):
     if len(gps) > 0:
         dist = distance(gps[0], gps[1])
     print(label, dist, gps)
+    scaling = 1/gpsmargin
 
     normal = torch.distributions.normal.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-    y = -math.log(1/sigma) - normal.log_prob((dist-D)/sigma)*lbl - torch.log(normal.cdf((D - gpsmargin)/sigma)) * (1-lbl)
+    # - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) # Pos
+    # - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl) # Neg
+    y = - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
     y = torch.sum(y)
     return y
 

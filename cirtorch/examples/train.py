@@ -36,7 +36,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitLoss']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss']
 optimizer_names = ['sgd', 'adam']
 
 
@@ -210,7 +210,7 @@ def main():
         criterion = RegressionContrastiveLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     elif args.loss == 'triplet':
         criterion = TripletLoss(margin=args.loss_margin).cuda()
-    elif args.loss == 'LogTobitLoss':
+    elif args.loss == 'LogTobitWeightedLoss':
         criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
@@ -458,7 +458,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 if i % 200 == 0:
                     batchid = 400 * epoch + i 
-                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
+                    #writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())
