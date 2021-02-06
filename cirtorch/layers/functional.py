@@ -197,15 +197,12 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1/2):
     dist = 1
     if len(gps) > 0:
         dist = distance(gps[0], gps[1])
-    print(label, dist, gps)
     scaling = 1/gpsmargin
 
-    normal = torch.distributions.normal.Normal(torch.tensor([0.0]), torch.tensor([1.0]))
-    # - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) # Pos
-    # - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl) # Neg
-    y = - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
-    y = torch.sum(y)
-    return y
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
+    log_tobit = - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
+    y = torch.sum(log_tobit)
+    return y, log_tobit[0]
 
 def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
     # x is D x N

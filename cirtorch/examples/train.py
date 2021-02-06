@@ -458,7 +458,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 if i % 200 == 0:
                     batchid = 400 * epoch + i 
-                    #writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
+                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())

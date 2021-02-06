@@ -150,9 +150,11 @@ class LogTobitLoss(nn.Module):
         self.eps = eps
         self.gpsmargin = gpsmargin
         self.sigma = sigma
+        self.weighting = 0
     
     def forward(self, x, label, gps=[]):
-        loss = LF.log_tobit(x, label, gps, margin=self.margin, eps=self.eps, gpsmargin=self.gpsmargin, sigma=self.sigma)
+        loss, pos_weight = LF.log_tobit(x, label, gps, margin=self.margin, eps=self.eps, gpsmargin=self.gpsmargin, sigma=self.sigma)
+        self.weighting = pos_weight
         return loss
 
     def __repr__(self):
