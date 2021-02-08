@@ -52,7 +52,7 @@ class TuplesDataset(data.Dataset):
             ie new q-p pairs are picked and negative images are remined
     """
 
-    def __init__(self, name, mode='train', imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader, posDistThr=10, negDistThr=25, root_dir = 'data', cities = ''):
+    def __init__(self, name, mode='train', imsize=None, nnum=5, qsize=2000, poolsize=20000, transform=None, loader=default_loader, posDistThr=10, negDistThr=25, root_dir = 'data', cities = '', tuple_mining='default'):
 
         if name.startswith('mapillary'):
             # Parameters  
@@ -105,7 +105,7 @@ class TuplesDataset(data.Dataset):
             self.transform = transform
             self.query_keys_with_no_match = []
             self.gpsInfo = {}
-            self.tuple_mining = 'default'
+            self.tuple_mining = tuple_mining
 
             # define sequence length based on task
             if task == 'im2im':
