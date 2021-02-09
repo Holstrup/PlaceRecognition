@@ -180,30 +180,6 @@ def regression_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=1
     y = torch.sum(y)
     return y, peak_scaling
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1/2):
-    # x is D x N
-    dim = x.size(0) # D
-    nq = torch.sum(label.data==-1) # number of tuples
-    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
-
-    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
-    idx = [i for i in range(len(label)) if label.data[i] != -1]
-    x2 = x[:, idx]
-    lbl = label[label!=-1]
-
-    dif = x1 - x2
-    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
-
-    dist = 1
-    if len(gps) > 0:
-        dist = distance(gps[0], gps[1])
-    scaling = 1/gpsmargin
-
-    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
-    log_tobit = - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
-    y = torch.sum(log_tobit)
-    return y, log_tobit[0]
-
 def linear_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15):
     # x is D x N
     dim = x.size(0) # D
@@ -288,3 +264,50 @@ def triplet_loss(x, label, margin=0.1):
     dist_neg = torch.sum(torch.pow(xa - xn, 2), dim=0)
 
     return torch.sum(torch.clamp(dist_pos - dist_neg + margin, min=0))
+
+
+def log_tobit_iteration1(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1/2):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+    dist = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+    scaling = 1/gpsmargin
+
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
+    log_tobit = - (math.log(1/sigma) + normal.log_prob((dist*scaling-D)/sigma)*lbl) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
+    y = torch.sum(log_tobit)
+    return y, log_tobit[0]
+
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1):
+    # Loss with only the CDF term 
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
+    scaling = 1 / (gpsmargin * 2)
+    cdf = (normal.cdf((D - gpsmargin*scaling)/sigma))*lbl + (1-normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
+    y = torch.sum(cdf)
+    return y, cdf[0]
