@@ -220,23 +220,37 @@ def main():
         if args.generate_plot:
             print('>>> {}: Generating Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
-            k = 5
-            
+            all_gps = np.zeros((len(qidxs),10))
+            all_emb = np.zeros((len(qidxs),10))
             for q in range(len(qidxs)):
-                k_indicies = indicies[q, :k]
-                print('K_Indicies', k_indicies)
-                k_dist = distances[q, :k]
-                print('K_distances', k_dist)
-                zero_score = scores[q, k_indicies[0]]
-                one_score = scores[q, k_indicies[0]]
-                print('0,1 Score:', zero_score, one_score)
-                
+                positive = 0
+                gps = []
+                emb = []
+                #pictures = []
+                while distances[q, positive] < 50 and positive < 10:
+                    index = indicies[q, positive]
+                    emb.append(scores[q, index].item())
+                    gps.append(distances[q, positive])
+                    #pictures.append(test_dataset.dbImages[index])
+                    positive += 1
+                emb = np.array(emb)
+                gps = np.array(gps)
+                all_gps[q, :min(10, len(gps))] = gps
+                all_emb[q, :min(10, len(emb))] = emb
+                #k_indicies = indicies[q, :k]
+                #print('K_Indicies', k_indicies)
+                #k_dist = distances[q, :k]
+                #print('K_distances', k_dist)
+                #zero_score = scores[q, k_indicies[0]]
+                #one_score = scores[q, k_indicies[1]]
+                #print('0,1 Score:', zero_score, one_score)
+             
 
 
-            #np.savetxt("gps.csv", gpsdistances, delimiter=",")
-            #np.savetxt("embedding.csv", embeddingdistances, delimiter=",")
+            np.savetxt("gps.csv", all_gps, delimiter=",")
+            np.savetxt("embedding.csv", all_emb, delimiter=",")
         
-        print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
+        #print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
