@@ -5,6 +5,8 @@ import time
 import math
 import pickle
 import pdb
+import io
+import PIL
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -614,17 +616,16 @@ def test(datasets, net):
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
 
+        scores = scores.cpu().numpy()
+        scores = np.transpose(scores)
+
         print('>> {}: Computing Recall and Map'.format(dataset))
         k = 5
         ks = [5]
         mean_ap = mapk(ranks, pidxs, k)
         rec = recall(ranks, pidxs, ks)
 
-        
-        plt.figure()
-        plt.plot(scores[0,:5], list(range(5)))
-        plt.title("test")
-        plt.savefig('testplot')
+        gen_plot(0, scores)
 
 
         print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
@@ -640,6 +641,18 @@ def save_checkpoint(state, is_best, directory):
 
 def distance(query, positive):
     return torch.norm(torch.tensor(query)-torch.tensor(positive))
+
+def gen_plot(q, scores):
+    global writer
+    plt.figure()
+    plt.scatter(list(range(20)), 1-scores[q,:20])
+    plt.title("Closest Point to Query")
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    writer.add_image(f'Image_{q}', image, 42)
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
