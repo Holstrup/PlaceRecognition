@@ -5,6 +5,7 @@ import pickle
 import pdb
 
 import numpy as np
+import pandas as pd
 
 import torch
 from torch.utils.model_zoo import load_url
@@ -222,35 +223,32 @@ def main():
             gpsinfo = test_dataset.gpsInfo
             all_gps = np.zeros((len(qidxs),10))
             all_emb = np.zeros((len(qidxs),10))
+            all_pics = []
             for q in range(len(qidxs)):
                 positive = 0
                 gps = []
                 emb = []
-                #pictures = []
+                pictures = []
                 while distances[q, positive] < 50 and positive < 10:
                     index = indicies[q, positive]
                     emb.append(scores[q, index].item())
                     gps.append(distances[q, positive])
-                    #pictures.append(test_dataset.dbImages[index])
+                    pictures.append(test_dataset.dbImages[index])
                     positive += 1
                 emb = np.array(emb)
                 gps = np.array(gps)
                 all_gps[q, :min(10, len(gps))] = gps
                 all_emb[q, :min(10, len(emb))] = emb
-                #k_indicies = indicies[q, :k]
-                #print('K_Indicies', k_indicies)
-                #k_dist = distances[q, :k]
-                #print('K_distances', k_dist)
-                #zero_score = scores[q, k_indicies[0]]
-                #one_score = scores[q, k_indicies[1]]
-                #print('0,1 Score:', zero_score, one_score)
+                all_pics.append(pictures)
              
 
 
             np.savetxt("gps.csv", all_gps, delimiter=",")
             np.savetxt("embedding.csv", all_emb, delimiter=",")
+            df = pd.DataFrame(all_pics)
+            df.to_csv('pictures.csv', index=False)
         
-        #print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
+        print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))

@@ -7,6 +7,7 @@ import pickle
 import pdb
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -324,7 +325,7 @@ def main():
         )
 
     # evaluate the network before starting
-    #test(args.test_datasets, model)
+    test(args.test_datasets, model)
 
     # initialize timers 
     train_epoch = 0
@@ -618,6 +619,13 @@ def test(datasets, net):
         ks = [5]
         mean_ap = mapk(ranks, pidxs, k)
         rec = recall(ranks, pidxs, ks)
+
+        
+        plt.figure()
+        plt.plot(scores[0,:5], list(range(5)))
+        plt.title("test")
+        plt.savefig('testplot')
+
 
         print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
