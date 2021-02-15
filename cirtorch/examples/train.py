@@ -131,7 +131,8 @@ parser.add_argument('--resume', default='', type=str, metavar='FILENAME',
 min_loss = float('inf')
 
 def main():
-    global args, min_loss, writer
+    global args, min_loss, writer, global_epoch
+    global_epoch = 0
     args = parser.parse_args()
 
     # manually check if there are unknown test datasets
@@ -335,6 +336,7 @@ def main():
     val_time = 0
     test_time = 0
     for epoch in range(start_epoch, args.epochs):
+        global_epoch = epoch
         print('> Starting Epoch {}/{}'.format(start_epoch, args.epochs))
         epoch_start = time.time()
 
@@ -625,7 +627,8 @@ def test(datasets, net):
         mean_ap = mapk(ranks, pidxs, k)
         rec = recall(ranks, pidxs, ks)
 
-        gen_plot(0, scores)
+        for q in range(1, 20, 5):
+            gen_plot(q, scores)
 
 
         print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
@@ -652,7 +655,7 @@ def gen_plot(q, scores):
     buf.seek(0)
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    writer.add_image(f'Image_{q}', image, 42)
+    writer.add_image(f'Image_{q}', image, global_epoch)
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
