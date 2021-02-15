@@ -290,7 +290,7 @@ def log_tobit_iteration1(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigm
     y = torch.sum(log_tobit)
     return y, log_tobit[0]
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1):
+def log_tobit_iteration2(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1):
     # Loss with only the CDF term 
 
     # x is D x N
@@ -309,5 +309,27 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1):
     normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
     scaling = 1 / (gpsmargin * 2)
     cdf = (normal.cdf((D - gpsmargin*scaling)/sigma))*lbl + (1-normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
+    y = torch.sum(cdf)
+    return y, cdf[0]
+
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1):
+    # Loss with only the CDF term 
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([1.0]).to(device=torch.device("cuda")))
+    scaling = 1 / (gpsmargin * 2)
+    cdf = -torch.log(1-normal.cdf((D - gpsmargin*scaling)/sigma))*lbl - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
     y = torch.sum(cdf)
     return y, cdf[0]
