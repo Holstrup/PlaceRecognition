@@ -675,7 +675,7 @@ def gen_plot(q, scores, ranks, pidxs):
     
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    writer.add_image(f'Image_{q}', image, global_epoch)
+    writer.add_image(f'Image_{q}', image[0], global_epoch)
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
