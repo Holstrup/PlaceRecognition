@@ -221,30 +221,40 @@ def main():
         if args.generate_plot:
             print('>>> {}: Generating Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
+            angleInfo = test_dataset.angleInfo
             all_gps = np.zeros((len(qidxs),10))
             all_emb = np.zeros((len(qidxs),10))
+            all_ang = np.zeros((len(qidxs),10))
             all_pics = []
             for q in range(len(qidxs)):
                 positive = 0
                 gps = []
                 emb = []
                 pictures = []
+                angles = []
                 while distances[q, positive] < 50 and positive < 10:
                     index = indicies[q, positive]
                     emb.append(scores[q, index].item())
                     gps.append(distances[q, positive])
                     pictures.append(test_dataset.dbImages[index])
+                    
+                    key = test_dataset.dbImages[index].split('/')[-1][:-4]
+                    angles.append(angleInfo[key])
+                    
                     positive += 1
                 emb = np.array(emb)
                 gps = np.array(gps)
                 all_gps[q, :min(10, len(gps))] = gps
                 all_emb[q, :min(10, len(emb))] = emb
+                all_ang[q, :min(10, len(emb))] = angles
                 all_pics.append(pictures)
+
              
 
 
             np.savetxt("gps.csv", all_gps, delimiter=",")
             np.savetxt("embedding.csv", all_emb, delimiter=",")
+            np.savetxt("angles.csv", all_ang, delimiter=",")
             df = pd.DataFrame(all_pics)
             df.to_csv('pictures.csv', index=False)
         
