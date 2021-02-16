@@ -656,17 +656,17 @@ def gen_plot(q, scores, ranks, pidxs):
     positive_ranks = []
     negative_ranks = []
 
-    for i in range(q_ranks):
+    for i in range(len(q_ranks)):
         if q_ranks[i] in q_pidx:
-            positives.append(1-q_ranks[i])
+            positives.append(1-q_scores[i])
             positive_ranks.append(i)
         else:
-            negatives.append(1-q_ranks[i])
+            negatives.append(1-q_scores[i])
             negative_ranks.append(i)
-
+    print(negative_ranks, negatives)
     plt.scatter(positive_ranks, positives, color='g')
     plt.scatter(negative_ranks, negatives, color='r')
-    plt.set_ylim([0.0, 1.0])
+    plt.ylim(0.0, 1.0)
     plt.title("Closest Point to Query")
 
     buf = io.BytesIO()
