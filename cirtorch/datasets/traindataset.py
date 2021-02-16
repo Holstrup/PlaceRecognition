@@ -105,6 +105,7 @@ class TuplesDataset(data.Dataset):
             self.transform = transform
             self.query_keys_with_no_match = []
             self.gpsInfo = {}
+            self.angleInfo = {}
             self.tuple_mining = tuple_mining
 
             # define sequence length based on task
@@ -127,12 +128,12 @@ class TuplesDataset(data.Dataset):
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(qData)
+                    self.addGpsInfo(qData, qDataRaw)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
                     dbDataRaw = pd.read_csv(join(root_dir, subdir, city, 'database', 'raw.csv'), index_col = 0)
-                    self.addGpsInfo(dbData)
+                    self.addGpsInfo(dbData, dbDataRaw)
 
                     # arange based on task
                     qSeqKeys, qSeqIdxs = self.arange_as_seq(qData, join(root_dir, subdir, city, 'query'), seq_length_q)
@@ -335,9 +336,12 @@ class TuplesDataset(data.Dataset):
         self.pidxs = [self.ppool[i] for i in range(len(self.ppool))]
         return self.qidxs, self.pidxs
 
-    def addGpsInfo(self, dataframe):
+    def addGpsInfo(self, dataframe, dataframe_raw):
         for index, row in dataframe.iterrows():
             self.gpsInfo[row['key']] = [row['easting'], row['northing']]
+        
+        for index, row in dataframe_raw.iterrows():
+            self.angleInfo[row['key']] = [row['ca']]
 
     def __calcSamplingWeights__(self):
         # length of query

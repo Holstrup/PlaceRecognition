@@ -209,24 +209,27 @@ def main():
         if args.generate_plot:
             print('>>> {}: Generating Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
+            angleInfo = test_dataset.angleInfo
             k = 5
             gpsdistances = np.zeros((ranks.shape[0], k))
             embeddingdistances = np.zeros((ranks.shape[0],k))
+            gpsangles = np.zeros((ranks.shape[0],k))
             for qidx in range(ranks.shape[0]):
                 points = ranks[qidx,:k]
                 q = test_dataset.qImages[qidx].split('/')[-1][:-4]
                 qcoor = gpsinfo[q]
                 ps = [test_dataset.dbImages[i].split('/')[-1][:-4] for i in points]
+                angles = []
                 for i in range(len(ps)):
                     ps[i] = distance(qcoor, gpsinfo[ps[i]])
-                #print(gpsinfo[q], gpsinfo[ps[0]])i
-                #embeddingdistances[qidx] = np.array(scores[qidx,:k])
+                    angles.append(angleInfo[ps[i]])
+
                 ps = np.array(ps)
                 embed = np.array(scores[qidx,:k])
                 gpsdistances[qidx,:] = ps
                 embeddingdistances[qidx,:] = embed
-                #print(q, ps, embed)
-            print(gpsdistances)
+                gpsangles[qidx, :] = angles
+
             np.savetxt("gps.csv", gpsdistances, delimiter=",")
             np.savetxt("embedding.csv", embeddingdistances, delimiter=",")
         print('>> {}: Computing Recall and Map'.format(dataset))
