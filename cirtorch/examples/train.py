@@ -628,7 +628,7 @@ def test(datasets, net):
         rec = recall(ranks, pidxs, ks)
 
         for q in range(1, 20, 5):
-            gen_plot(q, scores)
+            gen_plot(q, scores, ranks, pidxs)
 
 
         print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
@@ -645,14 +645,34 @@ def save_checkpoint(state, is_best, directory):
 def distance(query, positive):
     return torch.norm(torch.tensor(query)-torch.tensor(positive))
 
-def gen_plot(q, scores):
+def gen_plot(q, scores, ranks, pidxs):
     global writer
     plt.figure()
-    plt.scatter(list(range(20)), 1-scores[q,:20])
+    q_scores = scores[q,:20]
+    q_ranks = ranks[q,:20]
+    q_pidx = pidxs[q]
+    positives = []
+    negatives = []
+    positive_ranks = []
+    negative_ranks = []
+
+    for i in range(q_ranks):
+        if q_ranks[i] in q_pidx:
+            positives.append(1-q_ranks[i])
+            positive_ranks.append(i)
+        else:
+            negatives.append(1-q_ranks[i])
+            negative_ranks.append(i)
+
+    plt.scatter(positive_ranks, positives, color='g')
+    plt.scatter(negative_ranks, negatives, color='r')
+    plt.set_ylim([0.0, 1.0])
     plt.title("Closest Point to Query")
+
     buf = io.BytesIO()
     plt.savefig(buf, format='jpeg')
     buf.seek(0)
+    
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
     writer.add_image(f'Image_{q}', image, global_epoch)
