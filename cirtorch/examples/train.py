@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss, LearntLogTobitLoss
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
@@ -216,6 +216,8 @@ def main():
         criterion = TripletLoss(margin=args.loss_margin).cuda()
     elif args.loss == 'LogTobitWeightedLoss':
         criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
+    elif args.loss == 'LeartnLogTobitWeightedLoss':
+        criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr, scaling=1/15).cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
 
@@ -464,6 +466,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 if i % 200 == 0:
                     batchid = 400 * epoch + i 
                     writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
+                    writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())
