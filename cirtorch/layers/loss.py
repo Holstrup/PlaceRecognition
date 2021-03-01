@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.parameter import Parameter
 
 import cirtorch.layers.functional as LF
 
@@ -176,8 +177,8 @@ class LearntLogTobitLoss(nn.Module):
     >>> output.backward()
     """
 
-    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=15, sigma=2, scaling=1/15):
-        super(LogTobitLoss, self).__init__()
+    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100):
+        super(LearntLogTobitLoss, self).__init__()
         self.scaling = Parameter(torch.ones(1)*scaling) #scaling
         self.margin = margin
         self.eps = eps

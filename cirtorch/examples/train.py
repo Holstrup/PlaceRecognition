@@ -39,7 +39,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss']
 optimizer_names = ['sgd', 'adam']
 
 
@@ -216,8 +216,8 @@ def main():
         criterion = TripletLoss(margin=args.loss_margin).cuda()
     elif args.loss == 'LogTobitWeightedLoss':
         criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
-    elif args.loss == 'LeartnLogTobitWeightedLoss':
-        criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr, scaling=1/15).cuda()
+    elif args.loss == 'LearntLogTobitWeightedLoss':
+        criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
 
@@ -248,6 +248,10 @@ def main():
     # add final whitening if exists
     if model.whiten is not None:
         parameters.append({'params': model.whiten.parameters()})
+    
+    #TODO: Add Scaling Parameter & Save
+    if 'Learnt' in args.loss:
+        parameters.append({'params': criterion.parameters()})
 
     # define optimizer
     if args.optimizer == 'sgd':
