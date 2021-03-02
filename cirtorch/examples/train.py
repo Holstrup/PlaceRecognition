@@ -217,7 +217,7 @@ def main():
     elif args.loss == 'LogTobitWeightedLoss':
         criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     elif args.loss == 'LearntLogTobitWeightedLoss':
-        criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
+        criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr, scaling=15).cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
 
@@ -465,7 +465,14 @@ def train(train_loader, model, criterion, optimizer, epoch):
             # then, do backward pass for one tuple only
             # each backward pass gradients will be accumulated
             # the optimization step is performed for the full batch later
-            if 'Weighted' in args.loss:
+            if 'Learnt' in args.loss:
+                loss = criterion(output, target[q].cuda(), gps_info[q], epoch=epoch)
+                if i % 200 == 0:
+                    batchid = 400 * epoch + i 
+                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
+                    writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, epoch)
+                    writer.add_scalar('LearningRate/Beta', criterion.beta, epoch)
+            elif 'Weighted' in args.loss:
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 if i % 200 == 0:
                     batchid = 400 * epoch + i 

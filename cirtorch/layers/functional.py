@@ -335,7 +335,7 @@ def log_tobit_iteration3(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigm
     return y, cdf[0]
 
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100):
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100, beta=0):
     # CDF reverse engineered to look like contrastive 
 
     # x is D x N
@@ -356,7 +356,6 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scal
         dist = distance(gps[0], gps[1])
     
     normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([sigma]).to(device=torch.device("cuda")))
-
-    cdf = -torch.log(1-normal.cdf((D*scaling - dist)/sigma))*lbl - torch.log(normal.cdf((D*scaling - gpsmargin)/sigma)) * (1-lbl)
+    cdf = (-torch.log(1-normal.cdf((D*scaling - dist)/sigma))*beta + 0.5*lbl*torch.pow(D,2)*(1-beta))*lbl - torch.log(normal.cdf((D*scaling - gpsmargin)/sigma)) * (1-lbl)
     y = torch.sum(cdf)
-    return y, cdf[0]
+    return y, D[0]*scaling

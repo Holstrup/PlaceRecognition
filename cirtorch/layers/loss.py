@@ -184,10 +184,12 @@ class LearntLogTobitLoss(nn.Module):
         self.eps = eps
         self.gpsmargin = gpsmargin
         self.sigma = sigma
+        self.beta = 0
         self.weighting = 0
     
-    def forward(self, x, label, gps=[]):
-        loss, pos_weight = LF.log_tobit(x, label, gps, margin=self.margin, eps=self.eps, gpsmargin=self.gpsmargin, sigma=self.sigma, scaling=self.scaling)
+    def forward(self, x, label, gps=[], epoch = 1):
+        self.beta = min(100, epoch) / 100
+        loss, pos_weight = LF.log_tobit(x, label, gps, margin=self.margin, eps=self.eps, gpsmargin=self.gpsmargin, sigma=self.sigma, scaling=self.scaling, beta=self.beta)
         self.weighting = pos_weight
         return loss
 
