@@ -250,8 +250,8 @@ def main():
         parameters.append({'params': model.whiten.parameters()})
     
     #TODO: Add Scaling Parameter & Save
-    if 'Learnt' in args.loss:
-        parameters.append({'params': criterion.parameters()})
+    #if 'Learnt' in args.loss:
+    #    parameters.append({'params': criterion.parameters()})
 
     # define optimizer
     if args.optimizer == 'sgd':
@@ -471,7 +471,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     batchid = 400 * epoch + i 
                     writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
                     writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, epoch)
-                    writer.add_scalar('LearningRate/Beta', criterion.beta, epoch)
             elif 'Weighted' in args.loss:
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 if i % 200 == 0:
