@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss, LearntLogTobitLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss, LearntLogTobitLoss, ContrastiveLossVariant
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
@@ -39,7 +39,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss']
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss', 'ContrastiveWeightedLossVariant']
 optimizer_names = ['sgd', 'adam']
 
 
@@ -218,6 +218,8 @@ def main():
         criterion = LogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr).cuda()
     elif args.loss == 'LearntLogTobitWeightedLoss':
         criterion = LearntLogTobitLoss(margin=args.loss_margin, gpsmargin=posDistThr, scaling=15).cuda()
+    elif args.loss == 'ContrastiveWeightedLossVariant':
+        criterion = ContrastiveLossVariant().cuda()
     else:
         raise(RuntimeError("Loss {} not available!".format(args.loss)))
 
@@ -444,7 +446,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 dist = distance(gps_info[q][0], gps_info[q][2])
                 writer.add_scalar('GPSDistance/HardestNegative', dist, batchid)
 
-                if dist < 1000: # meters
+                if dist < 100: # meters
                     mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                     std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
                     images = input[q][0] * std + mean
@@ -473,10 +475,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
                     writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, epoch)
             elif 'Weighted' in args.loss:
                 loss = criterion(output, target[q].cuda(), gps_info[q])
-                if i % 200 == 0:
-                    batchid = 400 * epoch + i 
-                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
-                    writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, batchid)
+                #if i % 200 == 0:
+                #    batchid = 400 * epoch + i 
+                #    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
+                #    writer.add_scalar('Embeddings/LearntScaling', criterion.scaling, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())

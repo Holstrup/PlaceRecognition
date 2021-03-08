@@ -411,3 +411,83 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1.0, scal
     cdf = -lbl*(math.log(1/sigma) + normal.log_prob((dist*scaling - D) / sigma)) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
     y = torch.sum(cdf)
     return y, D[0]
+
+def contrastive_loss_mse_reference(x, label, margin=25, eps=1e-6): 
+    # Regular contrastive loss scaled up and then down again (sanity check)
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    D *= 35
+
+    y = 0.5*lbl*torch.pow(D,2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)    
+
+    y /= (35**2)
+    y = torch.sum(y)
+    return y
+
+def contrastive_loss_plus_mse(x, label, gps, margin=25, eps=1e-6, alpha=35, beta=0.5): 
+    # Regular contrastive loss scaled up and then down again (sanity check)
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    D *= alpha
+
+    gps_dist = 1
+    if len(gps) > 0:
+        gps_dist = distance(gps[0], gps[1])
+
+    y = 0.5*lbl*torch.pow(D,2) 
+    y += lbl * beta * torch.pow(D - gps_dist, 2)
+    y += 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)  
+
+    y /= (alpha**2)
+    y = torch.sum(y)
+    return y
+
+def contrastive_loss_mse(x, label, gps, margin=25, eps=1e-6, alpha=35, beta=0.5): 
+    # Regular contrastive loss scaled up and then down again (sanity check)
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    D *= alpha
+
+    gps_dist = 1
+    if len(gps) > 0:
+        gps_dist = distance(gps[0], gps[1])
+
+    y = lbl * beta * torch.pow(D - gps_dist, 2)
+    y += 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)  
+
+    y /= (alpha**2)
+    y = torch.sum(y)
+    return y

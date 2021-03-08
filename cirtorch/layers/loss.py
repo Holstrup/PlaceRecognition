@@ -195,6 +195,38 @@ class LearntLogTobitLoss(nn.Module):
     def __repr__(self):
         return self.__class__.__name__ + '(' + 'margin=' + '{:.4f}'.format(self.margin) + ')'
 
+class ContrastiveLossVariant(nn.Module):
+    r"""CONTRASTIVELOSS layer that computes contrastive loss for a batch of images:
+        Q query tuples, each packed in the form of (q,p,n1,..nN)
+
+    Args:
+        x: tuples arranges in columns as [q,p,n1,nN, ... ]
+        label: -1 for query, 1 for corresponding positive, 0 for corresponding negative
+        margin: contrastive loss margin. Default: 0.7
+
+    >>> contrastive_loss = ContrastiveLoss(margin=0.7)
+    >>> input = torch.randn(128, 35, requires_grad=True)
+    >>> label = torch.Tensor([-1, 1, 0, 0, 0, 0, 0] * 5)
+    >>> output = contrastive_loss(input, label)
+    >>> output.backward()
+    """
+
+    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=25, beta=0.5):
+        super(ContrastiveLossVariant, self).__init__()
+        self.margin = gpsmargin / margin
+        self.gpsmargin = gpsmargin
+        self.beta = beta
+        self.eps = eps
+
+    def forward(self, x, label, gps=[]):
+        loss = LF.contrastive_loss_mse_reference(x, label, margin=self.gpsmargin, eps=self.eps)
+        #loss = LF.contrastive_loss_plus_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
+        #loss = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
+        return loss
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' + 'margin=' + '{:.4f}'.format(self.margin) + ')'
+
 class TripletLoss(nn.Module):
 
     def __init__(self, margin=0.1):
