@@ -179,7 +179,7 @@ class LearntLogTobitLoss(nn.Module):
 
     def __init__(self, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100):
         super(LearntLogTobitLoss, self).__init__()
-        self.scaling = 300#  max(300 - epoch, 100) #Parameter(torch.ones(1)*scaling) #scaling
+        self.scaling = 300 #max(300 - epoch, 100) #Parameter(torch.ones(1)*scaling) #scaling
         self.margin = margin
         self.eps = eps
         self.gpsmargin = gpsmargin
@@ -187,7 +187,7 @@ class LearntLogTobitLoss(nn.Module):
         self.weighting = 0
     
     def forward(self, x, label, gps=[], epoch = 1):
-        self.scaling = max(300 - epoch, 100)
+        self.scaling = 1/max(300 - epoch, 0)
         loss, pos_weight = LF.log_tobit(x, label, gps, margin=self.margin, eps=self.eps, gpsmargin=self.gpsmargin, sigma=self.sigma, scaling=self.scaling)
         self.weighting = pos_weight
         return loss

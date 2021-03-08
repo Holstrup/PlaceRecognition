@@ -360,7 +360,7 @@ def log_tobit_iteration4(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigm
     y = torch.sum(cdf)
     return y, D[0]*scaling
 
-def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100):
+def log_tobit_iteration5(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scaling=100):
     # CDF reverse engineered to look like contrastive 
 
     # x is D x N
@@ -386,3 +386,28 @@ def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=5.0, scal
     cdf = lbl*(math.log(1/sigma) + normal.log_prob((dist - D*scaling) / sigma)) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(cdf)
     return y, D[0]*scaling
+
+def log_tobit(x, label, gps, margin=0.7, eps=1e-6, gpsmargin=15, sigma=1.0, scaling=100):
+    # CDF reverse engineered to look like contrastive 
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+    dist = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+    
+    normal = torch.distributions.normal.Normal(torch.tensor([0.0]).to(device=torch.device("cuda")), torch.tensor([sigma]).to(device=torch.device("cuda")))
+    cdf = -lbl*(math.log(1/sigma) + normal.log_prob((dist*scaling - D) / sigma)) - torch.log(normal.cdf((D - gpsmargin*scaling)/sigma)) * (1-lbl)
+    y = torch.sum(cdf)
+    return y, D[0]
