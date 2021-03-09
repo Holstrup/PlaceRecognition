@@ -211,17 +211,19 @@ class ContrastiveLossVariant(nn.Module):
     >>> output.backward()
     """
 
-    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=25, beta=0.5):
+    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=25, beta=1.0):
         super(ContrastiveLossVariant, self).__init__()
         self.margin = gpsmargin / margin
         self.gpsmargin = gpsmargin
         self.beta = beta
         self.eps = eps
+        self.mse_loss = 0
 
     def forward(self, x, label, gps=[]):
-        loss = LF.contrastive_loss_mse_reference(x, label, margin=self.gpsmargin, eps=self.eps)
+        #loss = LF.contrastive_loss_mse_reference(x, label, margin=self.gpsmargin, eps=self.eps)
         #loss = LF.contrastive_loss_plus_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
-        #loss = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
+        loss, mse_loss = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
+        self.mse_loss = mse_loss
         return loss
 
     def __repr__(self):
