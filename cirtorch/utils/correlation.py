@@ -3,9 +3,11 @@ import os
 import time
 import pickle
 import pdb
+import math
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.model_zoo import load_url
@@ -161,7 +163,8 @@ def main():
     negDistThr = 25
     test_dataset = TuplesDataset(
         name='mapillary',
-        mode='test',
+        #TODO: mode='test',
+        mode='train',
         imsize=imsize,
         transform=transform,
         posDistThr=posDistThr,
@@ -206,7 +209,7 @@ def main():
         distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
             
         # GPS: Sort distances
-        distances, indicies = torch.sort(distances, dim=1, descending=False)
+        ##distances, indicies = torch.sort(distances, dim=1, descending=False)
         
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
@@ -258,7 +261,37 @@ def main():
             df = pd.DataFrame(all_pics)
             df.to_csv('pictures.csv', index=False)
         
+        elif not args.generate_plot:
+
+            plt.imshow(scores, cmap='hot', interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('Scores_Heatmap')
+            """print('>>> {}: Generating Plot'.format(dataset))
+            gpsinfo = test_dataset.gpsInfo
+            angleInfo = test_dataset.angleInfo
+            
+            distance_matrix = np.zeros((len(qidxs), 25))
+
+            for q in range(len(qidxs)):
+                positive_no = 0
+                while distances[q, positive_no] < 25:
+                    index = indicies[q, positive_no]
+                    gps_dist = distances[q, positive_no]
+                    distance_matrix[q, math.trunc(gps_dist)] = scores[q, index].item()
+
+                    positive_no += 1
+            """
+                
+                
+                
+
+             
+
+
+        
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
+
+    
 
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
