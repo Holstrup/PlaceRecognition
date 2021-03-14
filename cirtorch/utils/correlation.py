@@ -222,7 +222,7 @@ def main():
         scores = np.transpose(scores)
 
         if args.generate_plot:
-            print('>>> {}: Generating Plot'.format(dataset))
+            print('>>> {}: Generating Correlation Data'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo
             all_gps = np.zeros((len(qidxs),10))
@@ -249,32 +249,36 @@ def main():
                 gps = np.array(gps)
                 all_gps[q, :min(10, len(gps))] = gps
                 all_emb[q, :min(10, len(emb))] = emb
-                #all_ang[q, :min(10, len(emb))] = angles
-                #all_pics.append(pictures)
+                all_ang[q, :min(10, len(emb))] = angles
+                all_pics.append(pictures)
 
              
 
 
-            np.savetxt("gps.csv", all_gps, delimiter=",")
-            np.savetxt("embedding.csv", all_emb, delimiter=",")
-            #np.savetxt("angles.csv", all_ang, delimiter=",")
-            #df = pd.DataFrame(all_pics)
-            #df.to_csv('pictures.csv', index=False)
+            np.savetxt("plots/gps.csv", all_gps, delimiter=",")
+            np.savetxt("plots/embedding.csv", all_emb, delimiter=",")
+            np.savetxt("plots/angles.csv", all_ang, delimiter=",")
+            df = pd.DataFrame(all_pics)
+            df.to_csv('plots/pictures.csv', index=False)
         
         elif args.generate_plot:
-
-            
-            print('--Starting ImShow--')
-            #scores = np.ones(np.shape(scores)) - scores
-            #plt.imshow(scores, interpolation='nearest')
-            #plt.colorbar()
-            #plt.savefig('Scores_Heatmap')
-            print('Done')
-            
-            print('>>> {}: Generating Plot'.format(dataset))
+            print('>>> {}: Generating Distance Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo
+
+            scores = np.ones(np.shape(scores)) - scores
+            plt.imshow(scores, interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('plots/q_scores_heatmap')
             
+            
+            scores = torch.mm(poolvecs.t(), poolvecs)
+            scores = np.ones(np.shape(scores)) - scores
+            plt.imshow(scores, interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('plots/pool_scores_heatmap')
+
+            """
             distance_matrix = np.zeros((len(qidxs), 50))
             gps_matrix = np.zeros((max(50, len(qidxs)), 50))
             for q in range(max(50, len(qidxs))):
@@ -285,13 +289,10 @@ def main():
                 
             plt.imshow(distance_matrix, interpolation='nearest')
             plt.colorbar()
-            plt.savefig('Distance_Matrix')    
-                
+            plt.savefig('plots/distance_matrix')
+            """
+            
 
-             
-
-
-        
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
     
