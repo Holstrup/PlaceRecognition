@@ -60,7 +60,7 @@ parser.add_argument('--multiscale', '-ms', metavar='MULTISCALE', default='[1]',
                     " examples: '[1]' | '[1, 1/2**(1/2), 1/2]' | '[1, 2**(1/2), 1/2**(1/2)]' (default: '[1]')")
 parser.add_argument('--whitening', '-w', metavar='WHITENING', default=None, choices=whitening_names,
                     help="dataset used to learn whitening for testing: " + 
-                        " | ".join(whitening_names) + 
+                        " | ".join(whitening_names) +
                         " (default: None)")
 parser.add_argument('--generate-plot', default=False, type=bool, metavar='PLOT',
                     help='Generates a plot over embedding distance and geographical distance')
@@ -163,7 +163,7 @@ def main():
     negDistThr = 25
     test_dataset = TuplesDataset(
         name='mapillary',
-        #TODO: mode='test',
+        #mode='test',
         mode='train',
         imsize=imsize,
         transform=transform,
@@ -209,7 +209,7 @@ def main():
         distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
             
         # GPS: Sort distances
-        ##distances, indicies = torch.sort(distances, dim=1, descending=False)
+        distances, indicies = torch.sort(distances, dim=1, descending=False)
         
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
@@ -249,40 +249,43 @@ def main():
                 gps = np.array(gps)
                 all_gps[q, :min(10, len(gps))] = gps
                 all_emb[q, :min(10, len(emb))] = emb
-                all_ang[q, :min(10, len(emb))] = angles
-                all_pics.append(pictures)
+                #all_ang[q, :min(10, len(emb))] = angles
+                #all_pics.append(pictures)
 
              
 
 
             np.savetxt("gps.csv", all_gps, delimiter=",")
             np.savetxt("embedding.csv", all_emb, delimiter=",")
-            np.savetxt("angles.csv", all_ang, delimiter=",")
-            df = pd.DataFrame(all_pics)
-            df.to_csv('pictures.csv', index=False)
+            #np.savetxt("angles.csv", all_ang, delimiter=",")
+            #df = pd.DataFrame(all_pics)
+            #df.to_csv('pictures.csv', index=False)
         
-        elif not args.generate_plot:
+        elif args.generate_plot:
 
-            plt.imshow(scores, cmap='hot', interpolation='nearest')
-            plt.colorbar()
-            plt.savefig('Scores_Heatmap')
-            """print('>>> {}: Generating Plot'.format(dataset))
+            
+            print('--Starting ImShow--')
+            #scores = np.ones(np.shape(scores)) - scores
+            #plt.imshow(scores, interpolation='nearest')
+            #plt.colorbar()
+            #plt.savefig('Scores_Heatmap')
+            print('Done')
+            
+            print('>>> {}: Generating Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo
             
-            distance_matrix = np.zeros((len(qidxs), 25))
-
-            for q in range(len(qidxs)):
-                positive_no = 0
-                while distances[q, positive_no] < 25:
-                    index = indicies[q, positive_no]
-                    gps_dist = distances[q, positive_no]
-                    distance_matrix[q, math.trunc(gps_dist)] = scores[q, index].item()
-
-                    positive_no += 1
-            """
+            distance_matrix = np.zeros((len(qidxs), 50))
+            gps_matrix = np.zeros((max(50, len(qidxs)), 50))
+            for q in range(max(50, len(qidxs))):
+                for i in range(50):
+                    index = indicies[q, i]
+                    gps_matrix[q,i] = distances[q, i]
+                    distance_matrix[q, i] = scores[q, index].item()
                 
-                
+            plt.imshow(distance_matrix, interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('Distance_Matrix')    
                 
 
              
