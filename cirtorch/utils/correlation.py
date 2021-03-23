@@ -4,6 +4,7 @@ import time
 import pickle
 import pdb
 import math
+import csv
 
 import numpy as np
 import pandas as pd
@@ -233,7 +234,7 @@ def main():
                 positive = 0
                 gps = []
                 emb = []
-                pictures = []
+                pictures = [test_dataset.qImages[qidxs[q]].split('/')[-1][:-4]]
                 angles = []
                 while distances[q, positive] < 50 and positive < 10:
                     index = indicies[q, positive]
@@ -249,19 +250,19 @@ def main():
                 gps = np.array(gps)
                 all_gps[q, :min(10, len(gps))] = gps
                 all_emb[q, :min(10, len(emb))] = emb
-                all_ang[q, :min(10, len(emb))] = angles
+                #all_ang[q, :min(10, len(emb))] = angles
                 all_pics.append(pictures)
 
              
-
-
+            output_plot(all_gps, all_emb)
             np.savetxt("plots/gps.csv", all_gps, delimiter=",")
             np.savetxt("plots/embedding.csv", all_emb, delimiter=",")
             np.savetxt("plots/angles.csv", all_ang, delimiter=",")
-            df = pd.DataFrame(all_pics)
-            df.to_csv('plots/pictures.csv', index=False)
+            with open("plots/pictures.csv", "w") as f:
+                writer = csv.writer(f, dialect='excel')
+                writer.writerows(all_pics)
         
-        elif args.generate_plot:
+        elif not args.generate_plot:
             print('>>> {}: Generating Distance Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo
@@ -270,13 +271,28 @@ def main():
             plt.imshow(scores, interpolation='nearest')
             plt.colorbar()
             plt.savefig('plots/q_scores_heatmap')
-            
+            plt.clf() 
             
             scores = torch.mm(poolvecs.t(), poolvecs)
+            scores = scores.cpu().numpy()
             scores = np.ones(np.shape(scores)) - scores
             plt.imshow(scores, interpolation='nearest')
             plt.colorbar()
             plt.savefig('plots/pool_scores_heatmap')
+            plt.clf()
+
+            distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
+            plt.imshow(distances, interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('plots/gps_distances_heatmap')
+            plt.clf() 
+
+            indicator = torch.where(distances > 25, torch.zeros(distances.size()), torch.ones(distances.size()))
+            plt.imshow(indicator, interpolation='nearest')
+            plt.colorbar()
+            plt.savefig('plots/gps_indicator')
+            plt.clf() 
+            
 
             """
             distance_matrix = np.zeros((len(qidxs), 50))
@@ -296,6 +312,18 @@ def main():
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
     
+
+def output_plot(gps, emb):
+    gps_flattened = gps.flatten()
+    emb = 1-emb
+    emb__flattened = emb.flatten()
+
+    fig, axs = plt.subplots(1, 1, figsize=(20,10))
+    axs.scatter(gps[gps != 0], emb[gps != 0], color='b')
+    axs.set_xlim([0, 25])
+    axs.set_ylim([0.0, 1.0])
+    axs.set_title('Aggregation of distances')
+    fig.savefig('plots/correlation_all_points')
 
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))

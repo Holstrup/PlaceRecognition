@@ -9,6 +9,7 @@ import torch
 import torch.utils.data as data
 import sys
 from sklearn.neighbors import NearestNeighbors
+import random
 
 from cirtorch.datasets.datahelpers import default_loader, imresize, cid2filename
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -414,7 +415,8 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.qImages[self.qidxs[index]]))
 
         # positive image
-        output.append(self.loader(self.dbImages[self.pidxs[index]][0])) #TODO: Sample with some prob. distribution 
+        pos_index = random.randint(0, len(self.dbImages[self.pidxs[index]])-1)
+        output.append(self.loader(self.dbImages[self.pidxs[index]][pos_index])) #TODO: Sample with some prob. distribution 
 
         # negative images
         for i in range(len(self.nidxs[index])):
