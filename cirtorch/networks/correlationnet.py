@@ -7,7 +7,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import numpy as np
-import imageio
 
 torch.manual_seed(1)    # reproducible
 
@@ -18,21 +17,22 @@ torch.manual_seed(1)    # reproducible
 """
 PARAMS
 """
-pool_path = '/Users/alexanderholstrup/Desktop/M/pool_raw.csv'
-df_path = '/Users/alexanderholstrup/Desktop/M/postprocessed.csv'
-utm_path = '/Users/alexanderholstrup/Desktop/M/pool_utm.txt'
+root_path = 'correlation_data'
+pool_path = f'{root_path}/pool_raw.csv'
+df_path = f'{root_path}/postprocessed.csv'
+utm_path = f'{root_path}/pool_utm.txt'
 
 
 BATCH_SIZE = 500
-EPOCH = 50
+EPOCH = 10000
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
 HIDDEN_DIM2 = 1024
 OUTPUT_DIM = 2
 
-LR = 0.01
-WD = 4e-3
+LR = 0.02
+WD = 0.10 #4e-3
 
 
 def TrainDataset(poolpath, dataframe_path, utm_path):
@@ -59,7 +59,7 @@ def TrainDataset(poolpath, dataframe_path, utm_path):
     return Data.DataLoader(
         dataset=torch_dataset, 
         batch_size=BATCH_SIZE, 
-        shuffle=True, num_workers=0,)
+        shuffle=True, num_workers=2,)
 
 
 """
@@ -86,6 +86,10 @@ TRAINING
 loader = TrainDataset(pool_path, df_path, utm_path)
 losses = np.zeros(EPOCH)
 for epoch in range(EPOCH):
+    if epoch == EPOCH // 2:
+        for g in optimizer.param_groups:
+            g['lr'] = 0.005
+            print('New lr')
     epoch_loss = 0
     for step, (batch_x, batch_y) in enumerate(loader): # for each training step
         
@@ -97,24 +101,26 @@ for epoch in range(EPOCH):
         loss = loss_func(prediction, b_y) 
         epoch_loss += loss
 
-        optimizer.zero_grad()   
+        #optimizer.zero_grad()   
         loss.backward()         
-        optimizer.step()        
+        #optimizer.step()        
 
-        if step == 1 and epoch == (EPOCH - 1): # (epoch % (EPOCH // 10) == 0):
+        if step == 1 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
             plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
             plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
             
             #plt.show()
-            plt.savefig(f'prediction_{epoch}.png')
+            plt.savefig(f'correlation_plots/prediction_{epoch}.png')
             plt.clf()
     print(f'{epoch}/{EPOCH} => {epoch_loss}')
     losses[epoch] = epoch_loss
+    optimizer.step()
+    optimizer.zero_grad()
 
 plt.plot(torch.linspace(0, EPOCH, EPOCH), losses, color = "blue", alpha=0.2)
-plt.savefig(f'loss.png')
+plt.savefig(f'correlation_plots/loss.png')
 plt.clf()
 
 plt.plot(torch.linspace(EPOCH // 2, EPOCH, EPOCH // 2), losses[EPOCH // 2:], color = "blue", alpha=0.2)
-plt.savefig(f'loss1.png')
+plt.savefig(f'correlation_plots/loss1.png')
 plt.clf()
