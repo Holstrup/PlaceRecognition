@@ -37,8 +37,8 @@ HIDDEN_DIM2 = 512
 HIDDEN_DIM3 = 256
 OUTPUT_DIM = 2
 
-LR = 0.2
-WD = 0.10 #4e-3
+LR = 0.01
+WD = 4e-3
 
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
 multiscale = '[1]'
@@ -163,9 +163,13 @@ def main():
     # Dataset
 
     input_data = poolvecs.T
-    input_data = input_data.cuda()
-    output_data = poolcoordinates.cuda()
+    output_data = poolcoordinates
+
+    input_data = standardize(input_data, 0)
+    output_data = standardize(output_data, 0)
     
+    input_data = input_data.cuda()
+    output_data = output_data.cuda() 
     N, D = input_data.size()
 
     print(input_data.size(), output_data.size())    
@@ -253,4 +257,4 @@ for epoch in range(EPOCH):
     optimizer.step()
     optimizer.zero_grad()
 
-torch.save(net.state_dict(), 'data/correlation_net/network.pth')
+#torch.save(net.state_dict(), 'data/correlation_net/network.pth')
