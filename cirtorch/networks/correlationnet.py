@@ -237,24 +237,36 @@ for epoch in range(EPOCH):
             b_y = b_y.cpu()
             prediction = prediction.cpu()
             
-            plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
-            plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
-
-            plt.title("Coordinates")
-
-            buf = io.BytesIO()
-            plt.savefig(buf, format='jpeg')
-            buf.seek(0)
-            
-            image = PIL.Image.open(buf)
-            image = transforms.ToTensor()(image).unsqueeze(0)
-            tensorboard.add_image('Coordinates', image[0], epoch)
-
-            plt.clf()
+            plot_points(b_y, prediction)
     
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
+
+    if epoch % (EPOCH // 10) == 0:
+        test(net, val_loader)
 
     optimizer.step()
     optimizer.zero_grad()
 
-#torch.save(net.state_dict(), 'data/correlation_net/network.pth')
+def plot_points(ground_truth, prediction):
+    plt.clf()
+    plt.scatter(ground_truth.data[:, 0].numpy(), ground_truth.data[:, 1].numpy(), color = "blue", alpha=0.2)
+    plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
+
+    plt.title("Coordinates")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+            
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    tensorboard.add_image('Coordinates', image[0], epoch)
+
+
+def test(network, validation_loader):
+    score = 0
+    for step, (batch_x, batch_y) in enumerate(validation_loader):
+        network.eval()
+        prediction = network(batch_x)
+        score += loss_func(prediction, b_y)
+    tensorboard.add_scalar('Loss/validation', score, epoch)
