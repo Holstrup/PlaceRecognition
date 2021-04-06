@@ -6,9 +6,9 @@ import torch.utils.data as Data
 import pandas as pd
 
 import matplotlib.pyplot as plt
-
 import numpy as np
 
+from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
@@ -19,7 +19,7 @@ torch.manual_seed(1)    # reproducible
 """
 PARAMS
 """
-root_path = 'correlation_data'
+root_path = '/Users/alexanderholstrup/Desktop/correlation_data'
 pool_path = f'{root_path}/pool_raw.csv'
 df_path = f'{root_path}/postprocessed.csv'
 utm_path = f'{root_path}/pool_utm.txt'
@@ -41,6 +41,9 @@ network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_
 multiscale = 1
 imsize = 1024
 
+"""
+Dataset
+"""
 def main():
     # loading network from path
     if network_path is not None:
@@ -136,21 +139,11 @@ def main():
     poolcoordinates = torch.tensor([test_dataset.gpsInfo[test_dataset.dbImages[i][-26:-4]]
                                     for i in range(len(test_dataset.dbImages))], dtype=torch.float)
 
-    # GPS: Compute distances
-    distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
-
-    # GPS: Sort distances
-    # distances, indicies = torch.sort(distances, dim=1, descending=False)
-
     # Step 3: Ranks
     scores = torch.mm(poolvecs.t(), qvecs)
-    # scores, ranks = torch.sort(scores, dim=0, descending=True) # Euclidan distance is 1 - Score
-
-    # ranks = ranks.cpu().numpy()
-    # ranks = np.transpose(ranks)
-
-    #scores = scores.cpu().numpy()
-    #scores = np.transpose(scores)
+    
+    # GPS: Compute distances
+    distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
     
     # Dataset
     print('Scores: ', scores.size())
@@ -176,6 +169,11 @@ def TrainDataset(poolpath, dataframe_path, utm_path):
             utm_coors = np.vstack((utm_coors, utm))
     utm_coors = utm_coors[1:, :].astype(float)
 
+    utm_coors -= np.mean(utm_coors, axis=0) #np.linalg.norm(utm_coors, axis=1)
+    utm_coors /= 6000
+
+    plt.scatter(utm_coors[:, 0], utm_coors[:, 1], color = "blue", alpha=0.2)
+    plt.scatter(poolvecs[:, 0], poolvecs[:, 1], color = "red", alpha=0.2)
     # To tensor
     poolvecs = torch.Tensor(poolvecs)
     utm_coors = torch.Tensor(utm_coors)
@@ -185,7 +183,7 @@ def TrainDataset(poolpath, dataframe_path, utm_path):
     return Data.DataLoader(
         dataset=torch_dataset, 
         batch_size=BATCH_SIZE, 
-        shuffle=True, num_workers=2,)
+        shuffle=True, num_workers=0,)
 
 
 """
@@ -202,27 +200,47 @@ net = torch.nn.Sequential(
     torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM),
 )
 
+# Define model
+"""class CorrelationNet(torch.nn.Module):
+    def __init__(self):
+        super(CorrelationNet, self).__init__()
+        self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
+        self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
+        self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
+        self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
+
+    def forward(self, x):
+        x = torch.nn.LeakyReLU(self.input(x))
+        x = torch.nn.LeakyReLU(self.hidden1(x))
+        x = torch.nn.LeakyReLU(self.hidden2(x))
+        x = self.output(x)
+        return x
+"""
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
 loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
-
-net.cuda()
-loss_func.cuda()
 
 """
 TRAINING
 """
 
+# Dataloader 
 #loader = TrainDataset(pool_path, df_path, utm_path)
 loader = main()
 
+# Network
+#net = CorrelationNet()
+net.cuda()
+loss_func.cuda()
+
+# Train loop
 losses = np.zeros(EPOCH)
 for epoch in range(EPOCH):
     if epoch == EPOCH // 2:
         for g in optimizer.param_groups:
             g['lr'] = 0.005
-            print('New lr')
+    
     epoch_loss = 0
-    for step, (batch_x, batch_y) in enumerate(loader):  # for each training step
+    for step, (batch_x, batch_y) in enumerate(loader):
 
         b_x = Variable(batch_x)
         b_y = Variable(batch_y)
@@ -253,3 +271,5 @@ plt.clf()
 plt.plot(torch.linspace(EPOCH // 2, EPOCH, EPOCH // 2), losses[EPOCH // 2:], color = "blue", alpha=0.2)
 plt.savefig(f'correlation_plots/loss1.png')
 plt.clf()
+
+torch.save(net.state_dict(), 'data/correlation_net/network.pth')
