@@ -202,6 +202,32 @@ class CorrelationNet(torch.nn.Module):
         x = self.output(x)
         return x
 
+
+def plot_points(ground_truth, prediction):
+    plt.clf()
+    plt.scatter(ground_truth.data[:, 0].numpy(), ground_truth.data[:, 1].numpy(), color = "blue", alpha=0.2)
+    plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
+
+    plt.title("Coordinates")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+            
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    tensorboard.add_image('Coordinates', image[0], epoch)
+
+
+def test(network, validation_loader):
+    score = 0
+    for step, (batch_x, batch_y) in enumerate(validation_loader):
+        network.eval()
+        prediction = network(batch_x)
+        score += loss_func(prediction, b_y)
+    tensorboard.add_scalar('Loss/validation', score, epoch)
+
+
 """
 TRAINING
 """
@@ -246,27 +272,3 @@ for epoch in range(EPOCH):
 
     optimizer.step()
     optimizer.zero_grad()
-
-def plot_points(ground_truth, prediction):
-    plt.clf()
-    plt.scatter(ground_truth.data[:, 0].numpy(), ground_truth.data[:, 1].numpy(), color = "blue", alpha=0.2)
-    plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
-
-    plt.title("Coordinates")
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='jpeg')
-    buf.seek(0)
-            
-    image = PIL.Image.open(buf)
-    image = transforms.ToTensor()(image).unsqueeze(0)
-    tensorboard.add_image('Coordinates', image[0], epoch)
-
-
-def test(network, validation_loader):
-    score = 0
-    for step, (batch_x, batch_y) in enumerate(validation_loader):
-        network.eval()
-        prediction = network(batch_x)
-        score += loss_func(prediction, b_y)
-    tensorboard.add_scalar('Loss/validation', score, epoch)
