@@ -218,6 +218,24 @@ def plot_points(ground_truth, prediction, mode='Train'):
     image = transforms.ToTensor()(image).unsqueeze(0)
     tensorboard.add_image(f'Coordinates - {mode}', image[0], epoch)
 
+def plot_correlation(ground_truth, prediction, mode='Train'):
+    plt.clf()
+    ground_truth = ground_truth.data.numpy()
+    prediction = prediction.data.numpy()
+
+    true_distances = np.linalg.norm(ground_truth - ground_truth[10], axis=0)
+    pred_distances = np.linalg.norm(prediction - prediction[10], axis=0)
+
+    plt.scatter(true_distances, pred_distances)
+    plt.title("Correlation between true distances and pred. distances")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+            
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    tensorboard.add_image(f'Correlation - {mode}', image[0], epoch)
 
 def test(network, validation_loader):
     score = 0
@@ -268,10 +286,11 @@ for epoch in range(EPOCH):
             prediction = prediction.cpu()
             
             plot_points(b_y, prediction, 'Train')
+            plot_correlation(b_y, prediction, 'Train')
     
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
-    if epoch % (EPOCH // 10) == 0:
+    if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
         test(net, val_loader)
 
     optimizer.step()
