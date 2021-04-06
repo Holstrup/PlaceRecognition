@@ -38,7 +38,7 @@ LR = 0.2
 WD = 0.10 #4e-3
 
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
-multiscale = 1
+multiscale = '[1]'
 imsize = 1024
 
 """
@@ -155,8 +155,16 @@ def main():
     distances = standardize(distances, dimension=0)
     
     # Dataset
-    N, D = distances.size
-    torch_dataset = Data.TensorDataset(scores, distances)
+
+    input_data = poolvecs.T
+    input_data = input_data.cuda()
+    output_data = poolcoordinates.cuda()
+    
+    N, D = input_data.size()
+
+    print(input_data.size(), output_data.size())    
+    
+    torch_dataset = Data.TensorDataset(input_data, output_data)
     train_set, val_set = torch.utils.data.random_split(torch_dataset, [N - N // 5, N // 5])    
     
     train_loader = Data.DataLoader(dataset=train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
@@ -218,14 +226,14 @@ class CorrelationNet(torch.nn.Module):
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
-        x = torch.nn.LeakyReLU(self.input(x))
-        x = torch.nn.LeakyReLU(self.hidden1(x))
-        x = torch.nn.LeakyReLU(self.hidden2(x))
+        x = F.leaky_relu(self.input(x))
+        x = F.leaky_relu(self.hidden1(x))
+        x = F.leaky_relu(self.hidden2(x))
         x = self.output(x)
         return x
 
-optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-loss_func = torch.nn.MSELoss()
+#optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
+#loss_func = torch.nn.MSELoss()
 
 """
 TRAINING
@@ -237,8 +245,11 @@ loader, val_loader = main()
 
 # Network
 net = CorrelationNet()
-net.cuda()
-loss_func.cuda()
+optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
+loss_func = torch.nn.MSELoss()
+
+net = net.cuda()
+loss_func = loss_func.cuda()
 
 # Train loop
 losses = np.zeros(EPOCH)
@@ -257,10 +268,10 @@ for epoch in range(EPOCH):
         loss.backward()         
 
         if step == 1 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
-            plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
-            plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
+            #plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
+            #plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
             
-            plt.show()
+            #plt.show()
             #plt.savefig(f'correlation_plots/prediction_{epoch}.png')
             plt.clf()
     print(f'{epoch}/{EPOCH} => {epoch_loss}')
