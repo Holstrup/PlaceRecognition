@@ -28,7 +28,7 @@ df_path = f'{root_path}/postprocessed.csv'
 utm_path = f'{root_path}/pool_utm.txt'
 
 
-BATCH_SIZE = 500
+BATCH_SIZE = 1000
 EPOCH = 1000
 
 INPUT_DIM = 2048
@@ -203,7 +203,7 @@ class CorrelationNet(torch.nn.Module):
         return x
 
 
-def plot_points(ground_truth, prediction):
+def plot_points(ground_truth, prediction, mode='Train'):
     plt.clf()
     plt.scatter(ground_truth.data[:, 0].numpy(), ground_truth.data[:, 1].numpy(), color = "blue", alpha=0.2)
     plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
@@ -216,15 +216,19 @@ def plot_points(ground_truth, prediction):
             
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    tensorboard.add_image('Coordinates', image[0], epoch)
+    tensorboard.add_image(f'Coordinates - {mode}', image[0], epoch)
 
 
 def test(network, validation_loader):
     score = 0
+    network.eval()
     for step, (batch_x, batch_y) in enumerate(validation_loader):
-        network.eval()
         prediction = network(batch_x)
-        score += loss_func(prediction, b_y)
+        score = loss_func(prediction, batch_y)
+
+        batch_y = batch_y.cpu()
+        prediction = prediction.cpu()
+        plot_points(batch_y, prediction, 'Validation') 
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
@@ -263,7 +267,7 @@ for epoch in range(EPOCH):
             b_y = b_y.cpu()
             prediction = prediction.cpu()
             
-            plot_points(b_y, prediction)
+            plot_points(b_y, prediction, 'Train')
     
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
