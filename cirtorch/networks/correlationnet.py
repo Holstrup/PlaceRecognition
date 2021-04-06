@@ -26,7 +26,7 @@ utm_path = f'{root_path}/pool_utm.txt'
 
 
 BATCH_SIZE = 500
-EPOCH = 10000
+EPOCH = 1000
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -34,7 +34,7 @@ HIDDEN_DIM2 = 512
 HIDDEN_DIM3 = 256
 OUTPUT_DIM = 2
 
-LR = 0.02
+LR = 0.2
 WD = 0.10 #4e-3
 
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
@@ -44,6 +44,13 @@ imsize = 1024
 """
 Dataset
 """
+
+def standardize(tensor, dimension):
+    means = tensor.mean(dim=dimension, keepdim=True)
+    stds = tensor.std(dim=dimension, keepdim=True)
+    return (tensor - means) / stds
+
+
 def main():
     # loading network from path
     if network_path is not None:
@@ -141,20 +148,23 @@ def main():
 
     # Step 3: Ranks
     scores = torch.mm(poolvecs.t(), qvecs)
+    scores = standardize(scores, dimension=0)
     
     # GPS: Compute distances
     distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
+    distances = standardize(distances, dimension=0)
     
     # Dataset
-    print('Scores: ', scores.size())
-    print('Distances: ', distances.size())
+    N, D = distances.size
     torch_dataset = Data.TensorDataset(scores, distances)
-    return Data.DataLoader(
-        dataset=torch_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True, num_workers=0,)
+    train_set, val_set = torch.utils.data.random_split(torch_dataset, [N - N // 5, N // 5])    
+    
+    train_loader = Data.DataLoader(dataset=train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
+    val_loader = Data.DataLoader(dataset=val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
 
-def TrainDataset(poolpath, dataframe_path, utm_path):
+    return train_loader, val_loader
+
+"""def TrainDataset(poolpath, dataframe_path, utm_path):
     # X - Image embeddings
     poolvecs = np.loadtxt(poolpath)
     poolvecs = poolvecs.T
@@ -170,10 +180,8 @@ def TrainDataset(poolpath, dataframe_path, utm_path):
     utm_coors = utm_coors[1:, :].astype(float)
 
     utm_coors -= np.mean(utm_coors, axis=0) #np.linalg.norm(utm_coors, axis=1)
-    utm_coors /= 6000
+    #utm_coors /= 6000
 
-    plt.scatter(utm_coors[:, 0], utm_coors[:, 1], color = "blue", alpha=0.2)
-    plt.scatter(poolvecs[:, 0], poolvecs[:, 1], color = "red", alpha=0.2)
     # To tensor
     poolvecs = torch.Tensor(poolvecs)
     utm_coors = torch.Tensor(utm_coors)
@@ -183,14 +191,14 @@ def TrainDataset(poolpath, dataframe_path, utm_path):
     return Data.DataLoader(
         dataset=torch_dataset, 
         batch_size=BATCH_SIZE, 
-        shuffle=True, num_workers=0,)
+        shuffle=True, num_workers=0,)"""
 
 
 """
 NETWORK
 """
 # another way to define a network
-net = torch.nn.Sequential(
+"""net = torch.nn.Sequential(
     torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1),
     torch.nn.LeakyReLU(),
     torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2),
@@ -198,10 +206,10 @@ net = torch.nn.Sequential(
     torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3),
     torch.nn.LeakyReLU(),
     torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM),
-)
+)"""
 
 # Define model
-"""class CorrelationNet(torch.nn.Module):
+class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
         self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
@@ -215,9 +223,9 @@ net = torch.nn.Sequential(
         x = torch.nn.LeakyReLU(self.hidden2(x))
         x = self.output(x)
         return x
-"""
+
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
+loss_func = torch.nn.MSELoss()
 
 """
 TRAINING
@@ -225,20 +233,16 @@ TRAINING
 
 # Dataloader 
 #loader = TrainDataset(pool_path, df_path, utm_path)
-loader = main()
+loader, val_loader = main()
 
 # Network
-#net = CorrelationNet()
+net = CorrelationNet()
 net.cuda()
 loss_func.cuda()
 
 # Train loop
 losses = np.zeros(EPOCH)
-for epoch in range(EPOCH):
-    if epoch == EPOCH // 2:
-        for g in optimizer.param_groups:
-            g['lr'] = 0.005
-    
+for epoch in range(EPOCH):    
     epoch_loss = 0
     for step, (batch_x, batch_y) in enumerate(loader):
 
@@ -256,8 +260,8 @@ for epoch in range(EPOCH):
             plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
             plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
             
-            #plt.show()
-            plt.savefig(f'correlation_plots/prediction_{epoch}.png')
+            plt.show()
+            #plt.savefig(f'correlation_plots/prediction_{epoch}.png')
             plt.clf()
     print(f'{epoch}/{EPOCH} => {epoch_loss}')
     losses[epoch] = epoch_loss
