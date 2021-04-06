@@ -3,18 +3,21 @@ from torchvision import transforms
 from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.utils.data as Data
-import pandas as pd
+from torch.utils.tensorboard import SummaryWriter
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import time
+import io
+import PIL
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 
-torch.manual_seed(1)    # reproducible
-
+torch.manual_seed(1)
 
 """
 PARAMS
@@ -40,6 +43,9 @@ WD = 0.10 #4e-3
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
 multiscale = '[1]'
 imsize = 1024
+
+t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
+tensorboard = SummaryWriter(f'data/correlation_runs/{INPUT_DIM}_{OUTPUT_DIM}_{t}')
 
 """
 Dataset
@@ -172,51 +178,11 @@ def main():
 
     return train_loader, val_loader
 
-"""def TrainDataset(poolpath, dataframe_path, utm_path):
-    # X - Image embeddings
-    poolvecs = np.loadtxt(poolpath)
-    poolvecs = poolvecs.T
-
-    # Y - Coordinates
-    df = pd.read_csv(dataframe_path)
-    utm_coors = np.zeros(2)
-    with open(utm_path, 'r') as filehandle:
-        for line in filehandle:
-            key = line[:-1][-26:-4]
-            utm = df.loc[df['key'] == key].values[0][2:4]
-            utm_coors = np.vstack((utm_coors, utm))
-    utm_coors = utm_coors[1:, :].astype(float)
-
-    utm_coors -= np.mean(utm_coors, axis=0) #np.linalg.norm(utm_coors, axis=1)
-    #utm_coors /= 6000
-
-    # To tensor
-    poolvecs = torch.Tensor(poolvecs)
-    utm_coors = torch.Tensor(utm_coors)
-
-    # Dataset
-    torch_dataset = Data.TensorDataset(poolvecs, utm_coors)
-    return Data.DataLoader(
-        dataset=torch_dataset, 
-        batch_size=BATCH_SIZE, 
-        shuffle=True, num_workers=0,)"""
-
 
 """
 NETWORK
 """
-# another way to define a network
-"""net = torch.nn.Sequential(
-    torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1),
-    torch.nn.LeakyReLU(),
-    torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2),
-    torch.nn.LeakyReLU(),
-    torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3),
-    torch.nn.LeakyReLU(),
-    torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM),
-)"""
 
-# Define model
 class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
@@ -232,15 +198,10 @@ class CorrelationNet(torch.nn.Module):
         x = self.output(x)
         return x
 
-#optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-#loss_func = torch.nn.MSELoss()
-
 """
 TRAINING
 """
-
-# Dataloader 
-#loader = TrainDataset(pool_path, df_path, utm_path)
+# Dataset
 loader, val_loader = main()
 
 # Network
@@ -248,6 +209,7 @@ net = CorrelationNet()
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
 loss_func = torch.nn.MSELoss()
 
+# Move to GPU
 net = net.cuda()
 loss_func = loss_func.cuda()
 
@@ -268,23 +230,27 @@ for epoch in range(EPOCH):
         loss.backward()         
 
         if step == 1 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
-            #plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
-            #plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
+            b_y = b_y.cpu()
+            prediction = prediction.cpu()
             
-            #plt.show()
-            #plt.savefig(f'correlation_plots/prediction_{epoch}.png')
+            plt.scatter(b_y.data[:, 0].numpy(), b_y.data[:, 1].numpy(), color = "blue", alpha=0.2)
+            plt.scatter(prediction.data[:, 0].numpy(), prediction.data[:, 1].numpy(), color = "red", alpha=0.2)
+
+            plt.title("Coordinates")
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format='jpeg')
+            buf.seek(0)
+            
+            image = PIL.Image.open(buf)
+            image = transforms.ToTensor()(image).unsqueeze(0)
+            tensorboard.add_image('Coordinates', image[0], epoch)
+
             plt.clf()
-    print(f'{epoch}/{EPOCH} => {epoch_loss}')
-    losses[epoch] = epoch_loss
+    
+    tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
+
     optimizer.step()
     optimizer.zero_grad()
-
-plt.plot(torch.linspace(0, EPOCH, EPOCH), losses, color = "blue", alpha=0.2)
-plt.savefig(f'correlation_plots/loss.png')
-plt.clf()
-
-plt.plot(torch.linspace(EPOCH // 2, EPOCH, EPOCH // 2), losses[EPOCH // 2:], color = "blue", alpha=0.2)
-plt.savefig(f'correlation_plots/loss1.png')
-plt.clf()
 
 torch.save(net.state_dict(), 'data/correlation_net/network.pth')
