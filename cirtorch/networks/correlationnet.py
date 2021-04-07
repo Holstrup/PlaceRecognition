@@ -11,6 +11,7 @@ import pandas as pd
 import time
 import io
 import PIL
+import math
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -50,11 +51,17 @@ tensorboard = SummaryWriter(f'data/correlation_runs/{INPUT_DIM}_{OUTPUT_DIM}_{t}
 """
 Dataset
 """
-
-def standardize(tensor, dimension):
+tensor_meta = []
+def standardize(tensor, dimension, save=False):
+    global tensor_meta
     means = tensor.mean(dim=dimension, keepdim=True)
     stds = tensor.std(dim=dimension, keepdim=True)
-    return (tensor - means) / stds
+    standardized_tensor = (tensor - means) / stds
+    means = means.cpu()
+    stds = stds.cpu()
+    if save:
+        tensor_meta = [means.numpy(), stds.numpy()]
+    return standardized_tensor
 
 
 def main():
@@ -154,11 +161,11 @@ def main():
 
     # Step 3: Ranks
     scores = torch.mm(poolvecs.t(), qvecs)
-    scores = standardize(scores, dimension=0)
+    #scores = standardize(scores, dimension=1, save=True)
     
     # GPS: Compute distances
     distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
-    distances = standardize(distances, dimension=0)
+    #distances = standardize(distances, dimension=1)
     
     # Dataset
 
@@ -166,7 +173,8 @@ def main():
     output_data = poolcoordinates
 
     input_data = standardize(input_data, 0)
-    output_data = standardize(output_data, 0)
+    output_data = standardize(output_data, 0, save=True)
+    print(tensor_meta)
     
     input_data = input_data.cuda()
     output_data = output_data.cuda() 
@@ -237,29 +245,30 @@ def plot_correlation(ground_truth, prediction, mode='Train'):
     image = transforms.ToTensor()(image).unsqueeze(0)
     tensorboard.add_image(f'Correlation - {mode}', image[0], epoch)
 
-def local_correlation_plot(ground_truth, prediction, mode='Train'):
+def local_correlation_plot(ground_truth, prediction, mode='Train', point=10):
     plt.clf()
     #ground_truth = ground_truth.data.numpy()
     #prediction = prediction.data.numpy()
 
     # Ground Truth
-    distances = torch.norm(ground_truth - ground_truth[10], dim=1)
-    distances, indicies = torch.sort(distances, dim=1, descending=False)
+    distances = torch.norm(ground_truth - ground_truth[point], dim=1)
+    print(distances.size())
+    distances, indicies = torch.sort(distances, dim=0, descending=False)
 
     # Predicted
-    pred_distances = torch.norm(prediction - prediction[10], dim=1)
+    pred_distances = torch.norm(prediction - prediction[point], dim=1)
     pred_distances = pred_distances.data.numpy()
-
+    
     i = 0
     correlated_points = []
-    while distances[i] < 50:
+    while i < 10:
         x = pred_distances[indicies[i]]
         y = distances[i]
         correlated_points.append([x, y])
         i += 1
     correlated_points = np.array(correlated_points)
-    
-    plt.scatter(true_distances, pred_distances)
+    #correlated_points = correlated_points * tensor_meta[1] + tensor_meta[0] 
+    plt.scatter(correlated_points[:, 1], correlated_points[:, 0])
     plt.title("Correlation between true distances and pred. distances - Locally")
 
     buf = io.BytesIO()
@@ -268,7 +277,7 @@ def local_correlation_plot(ground_truth, prediction, mode='Train'):
             
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    tensorboard.add_image(f'Local Correlation - {mode}', image[0], epoch)
+    tensorboard.add_image(f'Local Correlation point {point}- {mode}', image[0], epoch)
 
 
 def test(network, validation_loader):
@@ -294,6 +303,7 @@ loader, val_loader = main()
 # Network
 net = CorrelationNet()
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
 loss_func = torch.nn.MSELoss()
 
 # Move to GPU
@@ -316,18 +326,22 @@ for epoch in range(EPOCH):
  
         loss.backward()         
 
-        if step == 1 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+        if step == 1 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             b_y = b_y.cpu()
             prediction = prediction.cpu()
             
             plot_points(b_y, prediction, 'Train')
             plot_correlation(b_y, prediction, 'Train')
-            local_correlation_plot(b_y, prediction, 'Train')
-    
+            local_correlation_plot(b_y, prediction, 'Train', 10)
+            local_correlation_plot(b_y, prediction, 'Train', 42) 
+            local_correlation_plot(b_y, prediction, 'Train', 58)
+            local_correlation_plot(b_y, prediction, 'Train', 91)     
+ 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
-    if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+    if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
         test(net, val_loader)
 
     optimizer.step()
     optimizer.zero_grad()
+    scheduler.step()
