@@ -152,23 +152,11 @@ def main():
                                     for i in range(len(test_dataset.dbImages))], dtype=torch.float)
     
     # Dataset
-    if True:
-        input_data = poolvecs.T
-        output_data = poolcoordinates
+    input_data = poolvecs.T
+    output_data = poolcoordinates
 
-        input_data = standardize(input_data, 0)
-        output_data = standardize(output_data, 0, save=True)
-    else:
-        # GPS Distances
-        distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
-        distances, indicies = torch.sort(distances, dim=1, descending=False)
-
-        output_data = distances[:, :5]
-        input_data = torch.zeros(net.meta['outputdim'], len(qidxs), 5 + 1).cuda()
-        for vec in range(N):
-            input_data[:, vec, 0] = qvecs[:, vec]
-            for local_vec in range(5):
-                input_data[:, vec, local_vec + 1] = poolvecs[:, indicies[local_vec]]
+    input_data = standardize(input_data, 0)
+    output_data = standardize(output_data, 0, save=True)
 
     print(tensor_meta)
     input_data = input_data.cuda()
