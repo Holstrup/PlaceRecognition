@@ -237,6 +237,40 @@ def plot_correlation(ground_truth, prediction, mode='Train'):
     image = transforms.ToTensor()(image).unsqueeze(0)
     tensorboard.add_image(f'Correlation - {mode}', image[0], epoch)
 
+def local_correlation_plot(ground_truth, prediction, mode='Train'):
+    plt.clf()
+    #ground_truth = ground_truth.data.numpy()
+    #prediction = prediction.data.numpy()
+
+    # Ground Truth
+    distances = torch.norm(ground_truth - ground_truth[10], dim=1)
+    distances, indicies = torch.sort(distances, dim=1, descending=False)
+
+    # Predicted
+    pred_distances = torch.norm(prediction - prediction[10], dim=1)
+    pred_distances = pred_distances.data.numpy()
+
+    i = 0
+    correlated_points = []
+    while distances[i] < 50:
+        x = pred_distances[indicies[i]]
+        y = distances[i]
+        correlated_points.append([x, y])
+        i += 1
+    correlated_points = np.array(correlated_points)
+    
+    plt.scatter(true_distances, pred_distances)
+    plt.title("Correlation between true distances and pred. distances - Locally")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+            
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    tensorboard.add_image(f'Local Correlation - {mode}', image[0], epoch)
+
+
 def test(network, validation_loader):
     score = 0
     network.eval()
@@ -288,6 +322,7 @@ for epoch in range(EPOCH):
             
             plot_points(b_y, prediction, 'Train')
             plot_correlation(b_y, prediction, 'Train')
+            local_correlation_plot(b_y, prediction, 'Train')
     
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
