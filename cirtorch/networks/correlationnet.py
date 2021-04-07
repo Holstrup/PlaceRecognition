@@ -23,12 +23,6 @@ torch.manual_seed(1)
 """
 PARAMS
 """
-root_path = '/Users/alexanderholstrup/Desktop/correlation_data'
-pool_path = f'{root_path}/pool_raw.csv'
-df_path = f'{root_path}/postprocessed.csv'
-utm_path = f'{root_path}/pool_utm.txt'
-
-
 BATCH_SIZE = 1000
 EPOCH = 1000
 
@@ -122,7 +116,6 @@ def main():
     negDistThr = 25
     test_dataset = TuplesDataset(
         name='mapillary',
-        # mode='test',
         mode='train',
         imsize=imsize,
         transform=transform,
@@ -132,8 +125,7 @@ def main():
     )
     qidxs, pidxs = test_dataset.get_loaders()
 
-    opt = {'batch_size': 1, 'shuffle': False,
-           'num_workers': 8, 'pin_memory': True}
+    opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
     # Step 1: Extract Database Images - dbLoader
     dbLoader = torch.utils.data.DataLoader(
@@ -158,27 +150,30 @@ def main():
             [test_dataset.gpsInfo[test_dataset.qImages[i][-26:-4]] for i in qidxs], dtype=torch.float)
     poolcoordinates = torch.tensor([test_dataset.gpsInfo[test_dataset.dbImages[i][-26:-4]]
                                     for i in range(len(test_dataset.dbImages))], dtype=torch.float)
-
-    # Step 3: Ranks
-    scores = torch.mm(poolvecs.t(), qvecs)
-    #scores = standardize(scores, dimension=1, save=True)
-    
-    # GPS: Compute distances
-    distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
-    #distances = standardize(distances, dimension=1)
     
     # Dataset
+    if True:
+        input_data = poolvecs.T
+        output_data = poolcoordinates
 
-    input_data = poolvecs.T
-    output_data = poolcoordinates
+        input_data = standardize(input_data, 0)
+        output_data = standardize(output_data, 0, save=True)
+    else:
+        # GPS Distances
+        distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
+        distances, indicies = torch.sort(distances, dim=1, descending=False)
 
-    input_data = standardize(input_data, 0)
-    output_data = standardize(output_data, 0, save=True)
+        output_data = distances[:, :5]
+        input_data = torch.zeros(net.meta['outputdim'], len(qidxs), 5 + 1).cuda()
+        for vec in range(N):
+            input_data[:, vec, 0] = qvecs[:, vec]
+            for local_vec in range(5):
+                input_data[:, vec, local_vec + 1] = poolvecs[:, indicies[local_vec]]
+
     print(tensor_meta)
-    
     input_data = input_data.cuda()
     output_data = output_data.cuda() 
-    N, D = input_data.size()
+    N, _ = output_data.size()
 
     print(input_data.size(), output_data.size())    
     
@@ -235,6 +230,8 @@ def plot_correlation(ground_truth, prediction, mode='Train'):
     pred_distances = np.linalg.norm(prediction - prediction[10], axis=1)
 
     plt.scatter(true_distances, pred_distances)
+    plt.xlim([0, true_distances[-1]])
+    plt.ylim([0, 2*true_distances[-1]])
     plt.title("Correlation between true distances and pred. distances")
 
     buf = io.BytesIO()
@@ -252,7 +249,6 @@ def local_correlation_plot(ground_truth, prediction, mode='Train', point=10):
 
     # Ground Truth
     distances = torch.norm(ground_truth - ground_truth[point], dim=1)
-    print(distances.size())
     distances, indicies = torch.sort(distances, dim=0, descending=False)
 
     # Predicted
@@ -287,11 +283,12 @@ def test(network, validation_loader):
         prediction = network(batch_x)
         score = loss_func(prediction, batch_y)
 
-        batch_y = batch_y.cpu()
-        prediction = prediction.cpu()
-        plot_points(batch_y, prediction, 'Validation')
-        plot_correlation(batch_y, prediction, 'Validation')  
-    tensorboard.add_scalar('Loss/validation', score, epoch)
+        if step == 1:
+            batch_y = batch_y.cpu()
+            prediction = prediction.cpu()
+            plot_points(batch_y, prediction, 'Validation')
+            plot_correlation(batch_y, prediction, 'Validation')  
+            tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
 """
