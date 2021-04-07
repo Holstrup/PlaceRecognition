@@ -223,8 +223,8 @@ def plot_correlation(ground_truth, prediction, mode='Train'):
     ground_truth = ground_truth.data.numpy()
     prediction = prediction.data.numpy()
 
-    true_distances = np.linalg.norm(ground_truth - ground_truth[10], axis=0)
-    pred_distances = np.linalg.norm(prediction - prediction[10], axis=0)
+    true_distances = np.linalg.norm(ground_truth - ground_truth[10], axis=1)
+    pred_distances = np.linalg.norm(prediction - prediction[10], axis=1)
 
     plt.scatter(true_distances, pred_distances)
     plt.title("Correlation between true distances and pred. distances")
@@ -246,7 +246,8 @@ def test(network, validation_loader):
 
         batch_y = batch_y.cpu()
         prediction = prediction.cpu()
-        plot_points(batch_y, prediction, 'Validation') 
+        plot_points(batch_y, prediction, 'Validation')
+        plot_correlation(batch_y, prediction, 'Validation')  
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
