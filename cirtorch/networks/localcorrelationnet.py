@@ -51,6 +51,51 @@ tensorboard = SummaryWriter(f'data/correlation_runs/{INPUT_DIM}_{OUTPUT_DIM}_{t}
 """
 Dataset
 """
+def load_placereg_net():
+    # loading network from path
+    if network_path is not None:
+        state = torch.load(network_path)
+
+        # parsing net params from meta
+        # architecture, pooling, mean, std required
+        # the rest has default values, in case that is doesnt exist
+        net_params = {}
+        net_params['architecture'] = state['meta']['architecture']
+        net_params['pooling'] = state['meta']['pooling']
+        net_params['local_whitening'] = state['meta'].get(
+            'local_whitening', False)
+        net_params['regional'] = state['meta'].get('regional', False)
+        net_params['whitening'] = state['meta'].get('whitening', False)
+        net_params['mean'] = state['meta']['mean']
+        net_params['std'] = state['meta']['std']
+        net_params['pretrained'] = False
+
+        # load network
+        net = init_network(net_params)
+        net.load_state_dict(state['state_dict'])
+
+        # if whitening is precomputed
+        if 'Lw' in state['meta']:
+            net.meta['Lw'] = state['meta']['Lw']
+
+        print(">>>> loaded network: ")
+        print(net.meta_repr())
+
+        # setting up the multi-scale parameters
+    ms = list(eval(multiscale))
+    if len(ms) > 1 and net.meta['pooling'] == 'gem' and not net.meta['regional'] and not net.meta['whitening']:
+        msp = net.pool.p.item()
+        print(">> Set-up multiscale:")
+        print(">>>> ms: {}".format(ms))
+        print(">>>> msp: {}".format(msp))
+    else:
+        msp = 1
+
+    # moving network to gpu and eval mode
+    net.cuda()
+    return net
+
+model = load_placereg_net()
 # Data loading code
 print('MEAN: ' + str(model.meta['mean']))
 print('STD: ' + str(model.meta['std']))
@@ -150,7 +195,7 @@ for epoch in range(EPOCH):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
                 # compute output vector for image imi
-                output[:, imi] = model(input[q][imi].cuda()).squeeze()
+                output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
         
         loss = mse_loss(output, target[q].cuda(), gps_info[q])
         epoch_loss += loss
@@ -167,5 +212,27 @@ for epoch in range(EPOCH):
     scheduler.step()
 
 
-def mse_loss(output, target, gps_info):
-    return 1.0
+def distance(query, positive):
+    return np.linalg.norm(np.array(query)-np.array(positive))
+
+def mse_loss(x, label, gps, eps=1e-6):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    
+    dist = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+    
+    y = lbl*torch.pow((dist - D),2)
+    y = torch.sum(y)
+    return y
