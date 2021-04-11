@@ -217,22 +217,19 @@ def test(network, loader):
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
-def plot_points(network, loader, mode='Train'):
-    network.eval()
-    for i, (input, target, gps_info) in enumerate(loader):     
-        nq = len(input) # number of training tuples
-        ni = len(input[0]) # number of images per tuple
-        gps_info = torch.tensor(gps_info)
+def plot_points(ground_truth, prediction, mode='Train'):
+    plt.clf()
+    plt.scatter(ground_truth.data.numpy(), prediction.data.numpy(), color = "blue", alpha=0.2)
 
-        for q in range(nq):
-            output = torch.zeros(OUTPUT_DIM, ni).cuda()
-            for imi in range(ni):
-                # compute output vector for image imi
-                output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
-            dist, D, _ = distances(output, target[q].cuda(), gps_info[q])
-            dist.cpu()
-            D.cpu()
-            print(dist, D)
+    plt.title("Coordinates")
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='jpeg')
+    buf.seek(0)
+            
+    image = PIL.Image.open(buf)
+    image = transforms.ToTensor()(image).unsqueeze(0)
+    tensorboard.add_image(f'Coordinates - {mode}', image[0], epoch)
 
 # Network
 net = CorrelationNet()
@@ -269,6 +266,8 @@ for epoch in range(EPOCH):
                 D = D.cpu()
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
+        
+        plot_points(dist_gps, dist_lat)
 
         
  
