@@ -252,8 +252,8 @@ for epoch in range(EPOCH):
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
 
-        dist_lat = torch.zeros(nq).cuda()
-        dist_gps = torch.zeros(nq).cuda()
+        dist_lat = np.zeros(nq)
+        dist_gps = np.zeros(nq)
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
@@ -266,11 +266,11 @@ for epoch in range(EPOCH):
         
             if i == 0:
                 dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-                dist_lat[q] = D
+                D = D.cpu()
+                dist_lat[q] = D[0]
                 dist_gps[q] = dist
-                print(dist, D)
 
-        print(loss, epoch_loss)
+        
  
              
  
