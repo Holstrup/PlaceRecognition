@@ -252,23 +252,33 @@ for epoch in range(EPOCH):
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
 
+        dist_lat = torch.zeros(nq).cuda()
+        dist_gps = torch.zeros(nq).cuda()
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
                 # compute output vector for image imi
                 output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
+
+            loss = mse_loss(output, target[q].cuda(), gps_info[q])
+            epoch_loss += loss
+            loss.backward()    
         
-        loss = mse_loss(output, target[q].cuda(), gps_info[q])
-        epoch_loss += loss
+            if i == 0:
+                dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+                dist_lat[q] = D
+                dist_gps[q] = dist
+                print(dist, D)
+
         print(loss, epoch_loss)
  
-        loss.backward()         
+             
  
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
-    if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-        test(net, train_loader)
-        plot_points(net, train_loader)
+    #if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+    #    test(net, train_loader)
+    #    plot_points(net, train_loader)
 
     optimizer.step()
     optimizer.zero_grad()
