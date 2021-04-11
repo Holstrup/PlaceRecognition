@@ -17,6 +17,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
+from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 
 torch.manual_seed(1)
 
@@ -113,7 +114,7 @@ train_dataset = TuplesDataset(
         name='mapillary',
         mode='train',
         imsize=imsize,
-        nnum=5,
+        nnum=1,
         qsize=query_size,
         poolsize=pool_size,
         transform=transform,
@@ -127,7 +128,7 @@ val_dataset = TuplesDataset(
         name='mapillary',
         mode='val',
         imsize=imsize,
-        nnum=5,
+        nnum=1,
         qsize=float('Inf'),
         poolsize=float('Inf'),
         transform=transform,
@@ -171,6 +172,31 @@ class CorrelationNet(torch.nn.Module):
 """
 TRAINING
 """
+def distance(query, positive):
+    return np.linalg.norm(np.array(query)-np.array(positive))
+
+def mse_loss(x, label, gps, eps=1e-6):
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+    dist = 1
+    if len(gps) > 0:
+        dist = distance(gps[0], gps[1])
+    print(dist)
+    y = lbl*torch.pow((dist - D),2)
+    y = torch.sum(y)
+    return y
+
 # Network
 net = CorrelationNet()
 optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
@@ -180,13 +206,14 @@ loss_func = torch.nn.MSELoss()
 # Move to GPU
 net = net.cuda()
 loss_func = loss_func.cuda()
-
+avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
 # Train loop
 losses = np.zeros(EPOCH)
-for epoch in range(EPOCH):    
+for epoch in range(EPOCH):
+    print(f'=>{epoch}/{EPOCH}')    
     epoch_loss = 0
     for i, (input, target, gps_info) in enumerate(train_loader):
-        
+        print(i)        
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
@@ -199,13 +226,14 @@ for epoch in range(EPOCH):
         
         loss = mse_loss(output, target[q].cuda(), gps_info[q])
         epoch_loss += loss
+        print(loss, epoch_loss)
  
         loss.backward()         
  
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
-    if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-        test(net, val_loader)
+    #if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+    #    test(net, val_loader)
 
     optimizer.step()
     optimizer.zero_grad()
@@ -232,7 +260,7 @@ def mse_loss(x, label, gps, eps=1e-6):
     dist = 1
     if len(gps) > 0:
         dist = distance(gps[0], gps[1])
-    
+    print(dist) 
     y = lbl*torch.pow((dist - D),2)
     y = torch.sum(y)
     return y
