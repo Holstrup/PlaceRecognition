@@ -47,7 +47,7 @@ query_size = 2000
 pool_size = 20000
 
 t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
-tensorboard = SummaryWriter(f'data/correlation_runs/{INPUT_DIM}_{OUTPUT_DIM}_{t}')
+tensorboard = SummaryWriter(f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_{t}')
 
 """
 Dataset
@@ -203,6 +203,8 @@ def mse_loss(x, label, gps, eps=1e-6):
 def test(network, loader):
     score = 0
     network.eval()
+    dist_lat = np.zeros(nq)
+    dist_gps = np.zeros(nq)
     for i, (input, target, gps_info) in enumerate(loader):     
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
@@ -214,12 +216,23 @@ def test(network, loader):
                 # compute output vector for image imi
                 output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
             score += mse_loss(output, target[q].cuda(), gps_info[q])
+        
+        # Only for first batch
+        if i == 0:
+            dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+            D = D.cpu()
+            dist_lat[q] = D[0]
+            dist_gps[q] = dist
+    
+    plot_points(dist_gps, dist_lat, 'Validation')
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
 def plot_points(ground_truth, prediction, mode='Train'):
     plt.clf()
-    plt.scatter(ground_truth.data.numpy(), prediction.data.numpy(), color = "blue", alpha=0.2)
+    plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
+    plt.xlim([0, np.max(ground_truth)])
+    plt.ylim([0, np.max(ground_truth) + 5])
 
     plt.title("Coordinates")
 
@@ -238,19 +251,22 @@ scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.
 
 # Move to GPU
 net = net.cuda()
-avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
+
 # Train loop
 losses = np.zeros(EPOCH)
 for epoch in range(EPOCH):
-    print(f'=>{epoch}/{EPOCH}')    
+    print(f'=>{epoch}/{EPOCH}') 
+    avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
+    tensorboard.add_scalar('Embedding/AvgNegDistance', avg_neg_distance, epoch)
+
     epoch_loss = 0
+    dist_lat = np.zeros(nq)
+    dist_gps = np.zeros(nq)
     for i, (input, target, gps_info) in enumerate(train_loader):       
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
 
-        dist_lat = np.zeros(nq)
-        dist_gps = np.zeros(nq)
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
@@ -260,24 +276,21 @@ for epoch in range(EPOCH):
             loss = mse_loss(output, target[q].cuda(), gps_info[q])
             epoch_loss += loss
             loss.backward()    
-        
-            if i == 0:
+
+            # Only for first batch
+            if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                 dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
                 D = D.cpu()
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
-        
-        plot_points(dist_gps, dist_lat)
-
-        
- 
-             
  
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
+    tensorboard.add_scalar('Loss/AvgErrorDistance', math.sqrt(epoch_loss/len(train_loader)), epoch)
 
-    #if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-    #    test(net, train_loader)
-    #    plot_points(net, train_loader)
+    if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        plot_points(dist_gps, dist_lat)
+        test(net, val_loader)
+        torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
     optimizer.step()
     optimizer.zero_grad()
