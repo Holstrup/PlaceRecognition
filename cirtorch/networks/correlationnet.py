@@ -129,7 +129,7 @@ def load_dataloader(place_model, dataset, transform):
     output_data = poolcoordinates
 
     input_data = standardize(input_data, 0)
-    output_data = standardize(output_data, 0, save=True)
+    output_data = standardize(output_data, 0)
 
     input_data = input_data.cuda()
     output_data = output_data.cuda() 
@@ -240,8 +240,8 @@ def test(net, criterion, val_loader, epoch):
         if step == 0:
             batch_y = batch_y.cpu()
             prediction = prediction.cpu()
-            plot_points(batch_y, prediction, 'Validation')
-            plot_correlation(batch_y, prediction, 'Validation')  
+            plot_points(batch_y, prediction, 'Validation', epoch)
+            plot_correlation(batch_y, prediction, 'Validation', epoch)  
             tensorboard.add_scalar('Loss/validation', score, epoch)
 
 def main():
@@ -255,8 +255,8 @@ def main():
     # set up the transform
     resize = transforms.Resize((240, 320), interpolation=2)
     normalize = transforms.Normalize(
-        mean=net.meta['mean'],
-        std=net.meta['std']
+        mean=place_model.meta['mean'],
+        std=place_model.meta['std']
     )
     transform = transforms.Compose([
         resize,
@@ -309,7 +309,7 @@ def main():
             with torch.no_grad():
                 test(net, criterion, val_loader, epoch)
 
-
+main()
 
 """
 def local_correlation_plot(ground_truth, prediction, mode='Train', point=10):
