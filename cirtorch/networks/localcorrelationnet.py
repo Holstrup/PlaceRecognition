@@ -24,8 +24,8 @@ torch.manual_seed(1)
 """
 PARAMS
 """
-BATCH_SIZE = 1000
-EPOCH = 1000
+BATCH_SIZE = 500
+EPOCH = 200
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -146,11 +146,10 @@ train_loader = torch.utils.data.DataLoader(
 
 
 val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=BATCH_SIZE, shuffle=False,
+        val_dataset, batch_size=(BATCH_SIZE-100), shuffle=False,
         num_workers=workers, pin_memory=True,
         drop_last=True, collate_fn=collate_tuples
 )
-
 """
 NETWORK
 """
@@ -201,30 +200,30 @@ def mse_loss(x, label, gps, eps=1e-6):
     return y
 
 def test(network, loader):
+    avg_neg_distance = val_loader.dataset.create_epoch_tuples(model) 
     score = 0
-    network.eval()
-    dist_lat = np.zeros(nq)
-    dist_gps = np.zeros(nq)
-    for i, (input, target, gps_info) in enumerate(loader):     
+    for i, (input, target, gps_info) in enumerate(val_loader):     
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
+        dist_lat = np.zeros(nq)
+        dist_gps = np.zeros(nq)
 
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
                 # compute output vector for image imi
                 output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
-            score += mse_loss(output, target[q].cuda(), gps_info[q])
-        
+            loss = mse_loss(output, target[q].cuda(), gps_info[q])
+            score += loss
         # Only for first batch
         if i == 0:
             dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
             D = D.cpu()
             dist_lat[q] = D[0]
             dist_gps[q] = dist
+            plot_points(dist_gps, dist_lat, 'Validation')
     
-    plot_points(dist_gps, dist_lat, 'Validation')
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
@@ -255,17 +254,15 @@ net = net.cuda()
 # Train loop
 losses = np.zeros(EPOCH)
 for epoch in range(EPOCH):
-    print(f'=>{epoch}/{EPOCH}') 
-    avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
-    tensorboard.add_scalar('Embedding/AvgNegDistance', avg_neg_distance, epoch)
-
+    print(f'=>{epoch}/{EPOCH}')
+    avg_neg_distance = train_loader.dataset.create_epoch_tuples(model) 
     epoch_loss = 0
-    dist_lat = np.zeros(nq)
-    dist_gps = np.zeros(nq)
     for i, (input, target, gps_info) in enumerate(train_loader):       
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
+        dist_lat = np.zeros(nq)
+        dist_gps = np.zeros(nq)
 
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
@@ -283,12 +280,12 @@ for epoch in range(EPOCH):
                 D = D.cpu()
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
+                plot_points(dist_gps, dist_lat, 'Training')
  
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
     tensorboard.add_scalar('Loss/AvgErrorDistance', math.sqrt(epoch_loss/len(train_loader)), epoch)
 
     if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-        plot_points(dist_gps, dist_lat)
         test(net, val_loader)
         torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
