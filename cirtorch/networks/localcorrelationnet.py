@@ -186,7 +186,7 @@ def test(place_model, correlation_model, val_loader, epoch):
             dist_lat[q] = D[0]
             dist_gps[q] = dist
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
-    
+        del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
 
@@ -204,7 +204,6 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
             gps_info = torch.tensor(gps_info)
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
-
             for q in range(nq):
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
@@ -228,6 +227,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
         optimizer.step()
         optimizer.zero_grad()
         scheduler.step()
+        del output
 
 def main():
     # Load Networks
@@ -286,7 +286,7 @@ def main():
 
 
     val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=(BATCH_SIZE-100), shuffle=False,
+            val_dataset, batch_size=(BATCH_SIZE - 100), shuffle=False,
             num_workers=workers, pin_memory=True,
             drop_last=True, collate_fn=collate_tuples
     )
@@ -303,7 +303,10 @@ def main():
         train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            test(model, net, val_loader, epoch)
+            with torch.no_grad():
+                test(model, net, val_loader, epoch)
+            
+
             torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
 main()
