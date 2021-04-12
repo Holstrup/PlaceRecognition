@@ -94,7 +94,7 @@ def load_placereg_net():
     return net
 
 
-def plot_points(ground_truth, prediction, mode='Train'):
+def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
     plt.xlim([0, np.max(ground_truth)])
@@ -159,11 +159,11 @@ def mse_loss(x, label, gps, eps=1e-6):
     y = torch.sum(y)
     return y
 
-def test(place_model, correlation_model, val_loader):
+def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
     correlation_model.eval()
 
-    avg_neg_distance = val_loader.dataset.create_epoch_tuples(model) 
+    avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
     score = 0
     for i, (input, target, gps_info) in enumerate(val_loader):     
         nq = len(input) # number of training tuples
@@ -176,7 +176,7 @@ def test(place_model, correlation_model, val_loader):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
                 # compute output vector for image imi
-                output[:, imi] = net(model(input[q][imi].cuda()).squeeze())
+                output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
             loss = mse_loss(output, target[q].cuda(), gps_info[q])
             score += loss
         # Only for first batch
@@ -185,7 +185,7 @@ def test(place_model, correlation_model, val_loader):
             D = D.cpu()
             dist_lat[q] = D[0]
             dist_gps[q] = dist
-            plot_points(dist_gps, dist_lat, 'Validation')
+            plot_points(dist_gps, dist_lat, 'Validation', epoch)
     
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
@@ -221,7 +221,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-                    plot_points(dist_gps, dist_lat, 'Training')
+                    plot_points(dist_gps, dist_lat, 'Training', epoch)
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
@@ -303,6 +303,7 @@ def main():
         train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            test(model, net, val_loader)
+            test(model, net, val_loader, epoch)
             torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
+main()
