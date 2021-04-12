@@ -97,10 +97,10 @@ def load_placereg_net():
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
-    plt.xlim([0, np.max(ground_truth)])
-    plt.ylim([0, np.max(ground_truth) + 5])
+    plt.xlabel('Ground Truth Distance [GPS]')
+    plt.ylabel('Predicted Distance')
 
-    plt.title("Coordinates")
+    plt.title("True Distance v. Predicted Distance")
 
     buf = io.BytesIO()
     plt.savefig(buf, format='jpeg')
@@ -108,7 +108,7 @@ def plot_points(ground_truth, prediction, mode, epoch):
             
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
-    tensorboard.add_image(f'Coordinates - {mode}', image[0], epoch)
+    tensorboard.add_image(f'Distance Correlation - {mode}', image[0], epoch)
 
 """
 NETWORK
