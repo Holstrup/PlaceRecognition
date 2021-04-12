@@ -138,10 +138,13 @@ def load_dataloader(place_model, dataset, transform):
     print(input_data.size(), output_data.size())    
     
     torch_dataset = Data.TensorDataset(input_data, output_data)
+    train_set, val_set = torch.utils.data.random_split(dataset, [N - N // 5, N // 5])
     
-    data_loader = Data.DataLoader(dataset=torch_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
+    train_loader = Data.DataLoader(dataset=train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
+    val_loader = Data.DataLoader(dataset=val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
 
-    return data_loader
+
+    return train_loader, val_loader
 
 
 """
@@ -217,7 +220,7 @@ def train(train_loader, place_model, net, criterion, optimizer, scheduler, epoch
         epoch_loss += loss
         loss.backward()         
 
-        if step == 1 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        if step == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             b_y = b_y.cpu()
             prediction = prediction.cpu()
             
@@ -291,7 +294,7 @@ def main():
             root_dir = 'data',
             cities=''
     )
-    val_loader = load_dataloader(place_model, val_dataset, transform)
+    train_loader, val_loader = load_dataloader(place_model, val_dataset, transform)
     
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
@@ -301,10 +304,7 @@ def main():
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
         print(f'====> {epoch}/{EPOCH}')
-        # New tuples every epoch
-        train_dataset.create_epoch_tuples(place_model)
-        train_loader = load_dataloader(place_model, train_dataset, transform)
-
+        
         train(train_loader, place_model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
