@@ -186,8 +186,10 @@ def test(place_model, correlation_model, val_loader, epoch):
                 D = D.cpu()
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
-
-        plot_points(dist_gps, dist_lat, 'Validation', epoch)
+        
+        if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+            plot_points(dist_gps, dist_lat, 'Validation', epoch)
+        
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
@@ -222,7 +224,8 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-            plot_points(dist_gps, dist_lat, 'Training', epoch)
+            if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+                plot_points(dist_gps, dist_lat, 'Training', epoch)
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
