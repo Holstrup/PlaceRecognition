@@ -160,9 +160,9 @@ def distances(x, label, gps, eps=1e-6):
         dist = distance(gps[0], gps[1])
     return dist, D, lbl
 
-def mse_loss(x, label, gps, eps=1e-6):
+def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((dist - D),2)
+    y = lbl*torch.pow((dist - D),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
