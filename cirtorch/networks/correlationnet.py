@@ -311,7 +311,8 @@ def main():
             with torch.no_grad():
                 test(net, criterion, val_loader, epoch)
 
-main()
+if __name__ == '__main__':
+    main()
 
 """
 def local_correlation_plot(ground_truth, prediction, mode='Train', point=10):

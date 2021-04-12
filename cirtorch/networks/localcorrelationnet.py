@@ -179,13 +179,15 @@ def test(place_model, correlation_model, val_loader, epoch):
                 output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
             loss = mse_loss(output, target[q].cuda(), gps_info[q])
             score += loss
-        # Only for first batch
-        if i == 0:
-            dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-            D = D.cpu()
-            dist_lat[q] = D[0]
-            dist_gps[q] = dist
-            plot_points(dist_gps, dist_lat, 'Validation', epoch)
+        
+            # Only for first batch
+            if i == 0:
+                dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+                D = D.cpu()
+                dist_lat[q] = D[0]
+                dist_gps[q] = dist
+
+        plot_points(dist_gps, dist_lat, 'Validation', epoch)
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
@@ -220,7 +222,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-                    plot_points(dist_gps, dist_lat, 'Training', epoch)
+            plot_points(dist_gps, dist_lat, 'Training', epoch)
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
@@ -309,4 +311,5 @@ def main():
 
             torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
-main()
+if __name__ == '__main__':
+    main()
