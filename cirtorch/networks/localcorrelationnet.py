@@ -94,7 +94,6 @@ def load_placereg_net():
     return net
 
 
-
 def plot_points(ground_truth, prediction, mode='Train'):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
@@ -297,7 +296,6 @@ def main():
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     criterion = mse_loss
     
-
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
@@ -305,6 +303,6 @@ def main():
         train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            test(net, val_loader)
+            test(model, net, val_loader)
             torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
 
