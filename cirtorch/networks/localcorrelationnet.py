@@ -97,6 +97,13 @@ def load_placereg_net():
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
+    
+    x = np.linspace(0, 25, 25)
+    y = x
+    plt.plot(x, y, color = "green")
+
+    plt.xlim(0, negDistThr)
+    plt.ylim(0, negDistThr + 5)
     plt.xlabel('Ground Truth Distance [GPS]')
     plt.ylabel('Predicted Distance')
 
@@ -187,7 +194,7 @@ def test(place_model, correlation_model, val_loader, epoch):
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
         
-        if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
         
         del output
@@ -224,7 +231,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-            if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+            if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
