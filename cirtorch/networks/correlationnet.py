@@ -280,21 +280,7 @@ def main():
         root_dir = 'data',
         cities=''
     )
-
-    val_dataset = TuplesDataset(
-            name='mapillary',
-            mode='val',
-            imsize=imsize,
-            nnum=1,
-            qsize=float('Inf'),
-            poolsize=float('Inf'),
-            transform=transform,
-            posDistThr=negDistThr, # Use 25 meters for both pos and neg
-            negDistThr=negDistThr,
-            root_dir = 'data',
-            cities=''
-    )
-    train_loader, val_loader = load_dataloader(place_model, val_dataset, transform)
+    train_loader, val_loader = load_dataloader(place_model, train_dataset, transform)
     
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
