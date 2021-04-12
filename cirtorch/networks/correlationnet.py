@@ -291,10 +291,8 @@ def main():
             root_dir = 'data',
             cities=''
     )
-
-    train_loader = load_dataloader(place_model, train_dataset, transform)
     val_loader = load_dataloader(place_model, val_dataset, transform)
-
+    
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
@@ -303,6 +301,10 @@ def main():
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
         print(f'====> {epoch}/{EPOCH}')
+        # New tuples every epoch
+        train_dataset.create_epoch_tuples(place_model)
+        train_loader = load_dataloader(place_model, train_dataset, transform)
+
         train(train_loader, place_model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
