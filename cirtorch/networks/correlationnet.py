@@ -23,8 +23,8 @@ torch.manual_seed(1)
 """
 PARAMS
 """
-BATCH_SIZE = 1000
-EPOCH = 1000
+BATCH_SIZE = 100
+EPOCH = 100
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -40,8 +40,8 @@ multiscale = '[1]'
 imsize = 1024
 posDistThr = 25
 negDistThr = 25
-query_size = 2000
-pool_size = 20000
+query_size = 200
+pool_size = 2000
 
 t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
 tensorboard = SummaryWriter(f'data/correlation_runs/{INPUT_DIM}_{OUTPUT_DIM}_{t}')
@@ -131,18 +131,15 @@ def load_dataloader(place_model, dataset, transform):
     input_data = standardize(input_data, 0)
     output_data = standardize(output_data, 0)
 
-    input_data = input_data.cuda()
-    output_data = output_data.cuda() 
     N, _ = output_data.size()
-
-    print(input_data.size(), output_data.size())    
-    
     torch_dataset = Data.TensorDataset(input_data, output_data)
-    train_set, val_set = torch.utils.data.random_split(dataset, [N - N // 5, N // 5])
+    
+    train_size = int(0.8 * len(torch_dataset))
+    test_size = len(torch_dataset) - train_size
+    train_set, val_set = torch.utils.data.random_split(torch_dataset, [train_size, test_size])
     
     train_loader = Data.DataLoader(dataset=train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
     val_loader = Data.DataLoader(dataset=val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,)
-
 
     return train_loader, val_loader
 
@@ -215,7 +212,7 @@ def train(train_loader, place_model, net, criterion, optimizer, scheduler, epoch
         b_y = Variable(batch_y)
 
         prediction = net(b_x)
-        loss = criterion(prediction, b_y)
+        loss = criterion(prediction.cuda(), b_y.cuda())
 
         epoch_loss += loss
         loss.backward()         
@@ -238,7 +235,7 @@ def test(net, criterion, val_loader, epoch):
     net.eval()
     for step, (batch_x, batch_y) in enumerate(val_loader):
         prediction = net(batch_x)
-        score = criterion(prediction, batch_y)
+        score = criterion(prediction.cuda(), batch_y.cuda())
 
         if step == 0:
             batch_y = batch_y.cpu()
@@ -269,7 +266,7 @@ def main():
     
     train_dataset = TuplesDataset(
         name='mapillary',
-        mode='train',
+        mode='val',
         imsize=imsize,
         nnum=1,
         qsize=query_size,
@@ -281,7 +278,7 @@ def main():
         cities=''
     )
     train_loader, val_loader = load_dataloader(place_model, train_dataset, transform)
-    
+    print('LOADER LEN', len(train_loader))    
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
