@@ -24,7 +24,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 100
-EPOCH = 100
+EPOCH = 200
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -237,7 +237,7 @@ def test(net, criterion, val_loader, epoch):
         prediction = net(batch_x)
         score = criterion(prediction.cuda(), batch_y.cuda())
 
-        if step == 0:
+        if step == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             batch_y = batch_y.cpu()
             prediction = prediction.cpu()
             plot_points(batch_y, prediction, 'Validation', epoch)
@@ -278,7 +278,7 @@ def main():
         cities=''
     )
     train_loader, val_loader = load_dataloader(place_model, train_dataset, transform)
-    print('LOADER LEN', len(train_loader))    
+
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
