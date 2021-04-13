@@ -100,8 +100,8 @@ def linear_regression(ground_truth, prediction, mode, epoch):
     r_sq = model.score(ground_truth, prediction)
     slope = model.coef_
     
-    tensorboard.add_scalar(f'Plots/Correlation_{mode}', slope, epoch)
-    tensorboard.add_scalar(f'Plots/RSq_{mode}', r_sq, epoch)
+    tensorboard.add_scalar(f'Plots{mode}/Correlation', slope, epoch)  
+    tensorboard.add_scalar(f'Plots{mode}/RSq', r_sq, epoch)
     return model
 
 def plot_points(ground_truth, prediction, mode, epoch):
@@ -216,6 +216,15 @@ def test(place_model, correlation_model, val_loader, epoch):
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
+def log_tuple(input, epoch, i):
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
+    images = input[q][0] * std + mean
+    for image_tensor in input[q][1:]:
+        new_image = image_tensor * std + mean
+        images = torch.cat([images, new_image], dim=0)
+        tensorboard.add_images('ImageBatch: {}'.format(epoch + i), images, 0)
+
 
 # Train loop
 def train(train_loader, place_model, correlation_model, criterion, optimizer, scheduler, epoch):
@@ -232,6 +241,10 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
             for q in range(nq):
+                
+                if i == 0 and (q % BATCH_SIZE == 0): #TODO: Change this way of selecting tuples
+                    log_tuple(input, epoch, i)
+
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
                     # compute output vector for image imi
@@ -249,7 +262,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     dist_gps[q] = dist
             if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
                 average_dist = np.absolute(dist_gps - dist_lat)
-                tensorboard.add_scalar('Distances/AvgGPSDist', np.mean(average_dist), epoch)
+                tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
                 linear_regression(dist_gps, dist_lat, 'Training', epoch)
     
