@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.utils.data as Data
 from torch.utils.tensorboard import SummaryWriter
 
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -93,6 +94,15 @@ def load_placereg_net():
         msp = 1
     return net
 
+def linear_regression(ground_truth, prediction, mode, epoch):
+    ground_truth = ground_truth.reshape((-1, 1))
+    model = LinearRegression().fit(ground_truth, prediction)
+    r_sq = model.score(ground_truth, prediction)
+    slope = model.coef_
+    
+    tensorboard.add_scalar(f'Plots/Correlation_{mode}', slope, epoch)
+    tensorboard.add_scalar(f'Plots/RSq_{mode}', r_sq, epoch)
+    return model
 
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
@@ -101,6 +111,11 @@ def plot_points(ground_truth, prediction, mode, epoch):
     x = np.linspace(0, 25, 25)
     y = x
     plt.plot(x, y, color = "green")
+
+    model = linear_regression(ground_truth, prediction, mode, epoch)
+    x = np.linspace(0, 25, 25)
+    y = model.coef_ * x + model.intercept_
+    plt.plot(x, y, color = "blue")
 
     plt.xlim(0, negDistThr)
     plt.ylim(0, negDistThr + 5)
@@ -194,8 +209,9 @@ def test(place_model, correlation_model, val_loader, epoch):
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
         
-        if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
+            linear_regression(dist_gps, dist_lat, 'Training', epoch)
         
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
@@ -226,13 +242,16 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 loss.backward()    
 
                 # Only for first batch
-                if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+                if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
                     dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-            if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+            if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+                average_dist = np.absolute(dist_gps - dist_lat)
+                tensorboard.add_scalar('Distances/AvgGPSDist', np.mean(average_dist), epoch)
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
+                linear_regression(dist_gps, dist_lat, 'Training', epoch)
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
