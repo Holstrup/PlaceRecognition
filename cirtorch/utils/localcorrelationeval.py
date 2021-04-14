@@ -12,6 +12,7 @@ import time
 import io
 import PIL
 import math
+import csv
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -32,7 +33,7 @@ OUTPUT_DIM = 128  # TODO: Is this right?
 
 datasets_names = ['mapillary']
 place_model_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
-correlation_model_path = 'data/localcorrelationnet/model_'
+correlation_model_path = 'data/localcorrelationnet/model_2048_128_0.01_Epoch_199.pth'
 multiscale = '[1]'
 imsize = 320
 
@@ -70,7 +71,7 @@ Dataset
 """
 
 
-def load_placereg_net():
+def load_placereg_net(network_path):
     # loading network from path
     if network_path is not None:
         state = torch.load(network_path)
@@ -144,8 +145,8 @@ posDistThr = 25
 negDistThr = 25
 test_dataset = TuplesDataset(
     name='mapillary',
-    # mode='test',
     mode='train',
+    #mode='val',
     imsize=imsize,
     transform=transform,
     posDistThr=posDistThr,
@@ -183,9 +184,14 @@ for i, input in enumerate(qLoader):
     qvecs[:, i] = correlationnet(placenet(input.cuda()).data.squeeze())
 
 # Step 3: Ranks
-scores = torch.mm(poolvecs.t(), qvecs)
-scores = scores.cpu().numpy()
-scores = np.transpose(scores)
+#scores = torch.mm(poolvecs.t(), qvecs)
+D, N = qvecs.size()
+D, PoolN = poolvecs.size()
+scores = torch.zeros((N, PoolN))
+for im in range(N):
+    a = torch.norm(poolvecs.t() - qvecs[:, im], dim=1)
+    scores[im, :] = torch.norm(poolvecs.t() - qvecs[:, im], dim=1)
+scores = scores.cpu()#.numpy()
 
 # GPS: get query and pool coordinates
 querycoordinates = torch.tensor(
@@ -195,12 +201,10 @@ poolcoordinates = torch.tensor([test_dataset.gpsInfo[test_dataset.dbImages[i][-2
 
 # GPS: Compute distances
 distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
-
 # GPS: Sort distances
 distances, indicies = torch.sort(distances, dim=1, descending=False)
 
-
-print('>>> {}: Generating Correlation Data'.format(dataset))
+print('>>> {}: Generating Correlation Data')
 gpsinfo = test_dataset.gpsInfo
 angleInfo = test_dataset.angleInfo
 all_gps = np.zeros((len(qidxs), 10))
@@ -228,8 +232,8 @@ for q in range(len(qidxs)):
     all_gps[q, :min(10, len(gps))] = gps
     all_emb[q, :min(10, len(emb))] = emb
     all_pics.append(pictures)
-
-output_plot(all_gps, all_emb)
+    print(emb, gps, '\n')
+#output_plot(all_gps, all_emb)
 np.savetxt("plots/gps.csv", all_gps, delimiter=",")
 np.savetxt("plots/embedding.csv", all_emb, delimiter=",")
 np.savetxt("plots/angles.csv", all_ang, delimiter=",")
