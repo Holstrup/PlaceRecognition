@@ -26,7 +26,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 200
+EPOCH = 400
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -181,6 +181,18 @@ def mse_loss(x, label, gps, eps=1e-6, margin=25):
     y = torch.sum(y)
     return y
 
+def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
+    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    if D[0] <= delta:
+        y = lbl*torch.pow((dist - D),2)
+    else:
+        y = lbl*torch.abs(dist - D) - 1/2 * delta**2
+    y += 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y
+
+
+
 def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
     correlation_model.eval()
@@ -216,7 +228,7 @@ def test(place_model, correlation_model, val_loader, epoch):
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
-def log_tuple(input, epoch, i):
+def log_tuple(input, q, epoch, i):
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
     std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
     images = input[q][0] * std + mean
@@ -243,7 +255,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
             for q in range(nq):
                 
                 if i == 0 and (q % BATCH_SIZE == 0): #TODO: Change this way of selecting tuples
-                    log_tuple(input, epoch, i)
+                    log_tuple(input, q, epoch, i)
 
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
