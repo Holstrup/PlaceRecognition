@@ -510,25 +510,20 @@ def contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, 
     x2 = x[:, idx]
     lbl = label[label!=-1]
 
-    smoothing = np.full(len(lbl), smoothing)
-    smoothing[1:] *= -1
-
-
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     alpha = torch.ones(lbl.size()) * alpha
     alpha = alpha.cuda()    
     D = D * alpha 
 
-    gps_dist = 1
-    if len(gps) > 0:
-        gps_dist = distance(gps[0], gps[1])
+    smoothing = torch.zeros(len(lbl))
+    for i, gps_i in enumerate(gps[1:]):
+        smoothing[i] = 1 - distance(gps[0], gps_i)/50
+    smoothing = smoothing.cuda()
 
-    y = (lbl - smoothing) * torch.pow(D - gps_dist, 2) 
-    mse_loss = y / (alpha**2)
-    y += 0.5*(1-(lbl - smoothing))*torch.pow(torch.clamp(margin-D, min=0),2)  
+    y = 0.5*lbl*smoothing*torch.pow(D,2) + 0.5*(1-lbl)*smoothing*torch.pow(torch.clamp(margin-D, min=0),2)
 
     y /= (alpha**2)
     y = torch.sum(y)
     mse_loss = torch.sum(mse_loss)
-    return y, mse_loss
+    return y
