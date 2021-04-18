@@ -41,7 +41,7 @@ network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_
 multiscale = '[1]'
 imsize = 320
 
-posDistThr = 25
+posDistThr = 20
 negDistThr = 25
 workers = 8
 query_size = 2000
@@ -117,8 +117,8 @@ def plot_points(ground_truth, prediction, mode, epoch):
     y = model.coef_ * x + model.intercept_
     plt.plot(x, y, color = "blue")
 
-    plt.xlim(0, negDistThr)
-    plt.ylim(0, negDistThr + 5)
+    #plt.xlim(0, negDistThr)
+    #plt.ylim(0, negDistThr + 5)
     plt.xlabel('Ground Truth Distance [GPS]')
     plt.ylabel('Predicted Distance')
 
@@ -131,6 +131,8 @@ def plot_points(ground_truth, prediction, mode, epoch):
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
     tensorboard.add_image(f'Distance Correlation - {mode}', image[0], epoch)
+    #np.savetxt('plots/gps_{epoch}_{mode}', ground_truth, delimiter=",")
+    #np.savetxt('plots/embedding_{epoch}_{mode}', prediction, delimiter=",")
 
 """
 NETWORK
@@ -177,7 +179,7 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((dist - D),2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -197,7 +199,7 @@ def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
     correlation_model.eval()
 
-    avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
+    #avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
     score = 0
     for i, (input, target, gps_info) in enumerate(val_loader):     
         nq = len(input) # number of training tuples
@@ -243,7 +245,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
         place_model.eval()
         correlation_model.train()
         
-        avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
+        #avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
         
         epoch_loss = 0
         for i, (input, target, gps_info) in enumerate(train_loader):       
