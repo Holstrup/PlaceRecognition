@@ -353,7 +353,10 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     criterion = mse_loss
-    
+
+    avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
+    avg_neg_distance = val_loader.dataset.create_epoch_tuples(model)
+
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):

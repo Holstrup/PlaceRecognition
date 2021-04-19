@@ -27,6 +27,7 @@
 # -- end of LSF options --
 ### Load modules 
 echo "Started"
+export PYTHONPATH="${PYTHONPATH}:/zhome/5d/1/117324/Documents/PlaceRecognition" 
 module unload cuda
 module unload cudann
 module load cuda/9.0
@@ -42,7 +43,9 @@ source ~/hello_hpc/bin/activate
 ### echo $PWD
 ### pip3 install -r requirements.txt
 echo "Starting Training"
-### python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'contrastive' --resume 'model_best.pth.tar'
+#python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'contrastive' --resume 'model_epoch180.pth.tar'
 ### python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'LinearWeightedContrastive' --resume 'model_epoch200.pth.tar'
-### python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'LinearOverWeightedContrastive' --resume 'model_epoch200.pth.tar'
+python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'ContrastiveWeightedLossVariant'
+####python3 cirtorch/networks/localcorrelationnet.py
+### python3 cirtorch/networks/correlationnet.py
 echo "Finished Training"
