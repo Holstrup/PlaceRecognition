@@ -26,13 +26,13 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 400
+EPOCH = 200
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
 HIDDEN_DIM2 = 512
-HIDDEN_DIM3 = 256
-OUTPUT_DIM = 128 #TODO: Is this right?
+HIDDEN_DIM3 = 1024
+OUTPUT_DIM = 2048
 
 LR = 0.01
 WD = 4e-3
@@ -41,7 +41,7 @@ network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_
 multiscale = '[1]'
 imsize = 320
 
-posDistThr = 20
+posDistThr = 15
 negDistThr = 25
 workers = 8
 query_size = 2000
@@ -117,8 +117,6 @@ def plot_points(ground_truth, prediction, mode, epoch):
     y = model.coef_ * x + model.intercept_
     plt.plot(x, y, color = "blue")
 
-    #plt.xlim(0, negDistThr)
-    #plt.ylim(0, negDistThr + 5)
     plt.xlabel('Ground Truth Distance [GPS]')
     plt.ylabel('Predicted Distance')
 
@@ -142,12 +140,14 @@ class CorrelationNet(torch.nn.Module):
         super(CorrelationNet, self).__init__()
         self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
         self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
+        self.hidden12 = torch.nn.Dropout(p=0.2)
         self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
         x = F.leaky_relu(self.hidden1(x))
+        x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
         x = self.output(x)
         return x
@@ -311,28 +311,28 @@ def main():
         name='mapillary',
         mode='train',
         imsize=imsize,
-        nnum=1,
+        nnum=0,
         qsize=query_size,
         poolsize=pool_size,
         transform=transform,
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        cities=''
+        cities='debug'
     )
 
     val_dataset = TuplesDataset(
             name='mapillary',
             mode='val',
             imsize=imsize,
-            nnum=1,
+            nnum=0,
             qsize=float('Inf'),
             poolsize=float('Inf'),
             transform=transform,
             posDistThr=negDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            cities=''
+            cities='debug'
     )
 
     # Dataloaders
