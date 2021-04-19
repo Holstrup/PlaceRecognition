@@ -624,15 +624,18 @@ class TuplesDataset(data.Dataset):
                 while len(nidxs) < self.nnum:
                     #TODO: This will choose the same negatives every time (assuming the samples are the same)
                     # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
-                    potential = idxs2images[indicies[q, r]] 
+                    if (len(nidxs) < self.nnum // 2):
+                        potential = idxs2images[indicies[q, r]] 
+                    else:
+                        r = random.randint(len(nidxs), idxs2images)
+                        potential = idxs2images[indicies[q, r]]
                     
                     #TODO: Do we still need the cluster information? 
                     # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
                     # clusters = self.clusters[idxs2qpool[q]]
                     
-                    if distances[r, q] >= self.negDistThr:
+                    if distances[r, q] >= self.negDistThr and (potential not in nidxs):
                         nidxs.append(potential)
-                        # clusters = np.append(clusters, np.array(potential))
                         avg_ndist += distances[q, r]
                         n_ndist += 1
                     r += 1
