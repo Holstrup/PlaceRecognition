@@ -67,6 +67,8 @@ parser.add_argument('--test-freq', default=20, type=int, metavar='N',
 
 parser.add_argument('--cities', metavar='CITIES', default='', help='city mode')
 parser.add_argument('--tuple-mining', metavar='TUPLES', default='default', help='tuple mining')
+parser.add_argument('--posDistThr', metavar='POSITIVEDIST', default=15, help='tuple mining', type=int)
+parser.add_argument('--negDistThr', metavar='NEGATIVEDIST', default=25, help='tuple mining', type=int)
 
 # network architecture and initialization options
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet101', choices=model_names,
@@ -200,11 +202,11 @@ def main():
     model.cuda()
 
     if 'Weighted' in args.loss:
-        posDistThr=15
-        negDistThr=25
+        posDistThr=args.posDistThr #15
+        negDistThr=args.negDistThr #25
     else:
-        posDistThr=15
-        negDistThr=25
+        posDistThr=args.posDistThr #15
+        negDistThr=args.negDistThr #25
         
     # define loss function (criterion) and optimizer
     if args.loss == 'contrastive':

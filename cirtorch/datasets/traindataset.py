@@ -424,7 +424,7 @@ class TuplesDataset(data.Dataset):
 
         # positive image
         pos_index = random.randint(0, len(self.dbImages[self.pidxs[index]])-1)
-        output.append(self.loader(self.dbImages[self.pidxs[index]][pos_index])) #TODO: Sample with some prob. distribution 
+        output.append(self.loader(self.dbImages[self.pidxs[index]][pos_index])) 
 
         # negative images
         for i in range(len(self.nidxs[index])):
