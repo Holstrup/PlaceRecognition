@@ -65,6 +65,8 @@ parser.add_argument('--test-whiten', metavar='DATASET', default='', choices=test
 parser.add_argument('--test-freq', default=20, type=int, metavar='N', 
                     help='run test evaluation every N epochs (default: 1)')
 
+parser.add_argument('--cities', metavar='CITIES', default='', help='city mode')
+
 # network architecture and initialization options
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet101', choices=model_names,
                     help='model architecture: ' +
@@ -200,7 +202,7 @@ def main():
         posDistThr=15
         negDistThr=25
     else:
-        posDistThr=10
+        posDistThr=15
         negDistThr=25
         
     # define loss function (criterion) and optimizer
@@ -308,7 +310,7 @@ def main():
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        cities=''
+        cities=args.cities
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -327,7 +329,7 @@ def main():
             posDistThr=negDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            cities=''
+            cities=args.cities
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False,
@@ -387,7 +389,6 @@ def main():
                 test_start = time.time()
                 mAP, rec = test(args.test_datasets, model)
                 
-                #TODO: Renaming 
                 # remember best loss and save checkpoint
                 is_best = loss < min_loss
                 min_loss = min(loss, min_loss) # And max

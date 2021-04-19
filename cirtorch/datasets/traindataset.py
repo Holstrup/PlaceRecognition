@@ -16,11 +16,17 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
 
 default_cities = {
-    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki"],
-              #"tokyo","toronto","saopaulo","moscow","trondheim","paris","bangkok",
-              #"budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
+    'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
+              "tokyo","toronto","saopaulo","moscow","trondheim","paris","bangkok",
+              "budapest","austin","berlin","ottawa","phoenix","goa","amman","nairobi","manila"],
     'val': ["cph", "sf"],
-    'test': ["miami","athens","buenosaires"] #,"stockholm","bengaluru","kampala"]
+    'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
+}
+
+default_cities_debug = {
+    'train': ["zurich"],
+    'val': ["cph", "sf"],
+    'test': ["miami"]
 }
 
 class TuplesDataset(data.Dataset):
@@ -69,7 +75,9 @@ class TuplesDataset(data.Dataset):
             assert seq_length % 2 == 1
             assert (task == 'im2im' and seq_length == 1) or (task != 'im2im' and seq_length > 1)
 
-            if cities in default_cities:
+            if cities == 'debug':
+                self.cities = default_cities_debug[mode]
+            elif cities in default_cities:
                 self.cities = default_cities[cities]
             elif cities == '':
                 self.cities = default_cities[mode]
