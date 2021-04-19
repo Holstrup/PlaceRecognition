@@ -66,6 +66,7 @@ parser.add_argument('--test-freq', default=20, type=int, metavar='N',
                     help='run test evaluation every N epochs (default: 1)')
 
 parser.add_argument('--cities', metavar='CITIES', default='', help='city mode')
+parser.add_argument('--tuple-mining', metavar='TUPLES', default='default', help='tuple mining')
 
 # network architecture and initialization options
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet101', choices=model_names,
@@ -310,7 +311,8 @@ def main():
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        cities=args.cities
+        cities=args.cities,
+        tuple_mining=args.tuple_mining
     )
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -329,7 +331,8 @@ def main():
             posDistThr=negDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            cities=args.cities
+            cities=args.cities,
+            tuple_mining=args.tuple_mining
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False,
