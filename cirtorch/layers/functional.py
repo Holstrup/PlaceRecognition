@@ -525,4 +525,5 @@ def contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, 
 
     y /= (alpha**2)
     y = torch.sum(y)
-    return y
+    smoothing_factor = torch.sum(smoothing)
+    return y, smoothing_factor

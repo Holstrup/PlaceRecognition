@@ -627,14 +627,14 @@ class TuplesDataset(data.Dataset):
                     if (len(nidxs) < self.nnum // 2):
                         potential = idxs2images[indicies[q, r]] 
                     else:
-                        r = random.randint(len(nidxs), idxs2images)
+                        r = random.randint(len(nidxs), len(idxs2images)-1)
                         potential = idxs2images[indicies[q, r]]
                     
                     #TODO: Do we still need the cluster information? 
                     # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
                     # clusters = self.clusters[idxs2qpool[q]]
-                    
-                    if distances[r, q] >= self.negDistThr and (potential not in nidxs):
+                    #print(float(distances[r, q]), self.negDistThr, float(distances[r, q]) >= self.negDistThr) 
+                    if float(distances[q, r]) >= self.negDistThr and (potential not in nidxs):
                         nidxs.append(potential)
                         avg_ndist += distances[q, r]
                         n_ndist += 1
