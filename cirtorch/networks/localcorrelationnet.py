@@ -13,6 +13,7 @@ import time
 import io
 import PIL
 import math
+import csv
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -26,7 +27,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 200
+EPOCH = 100
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -129,8 +130,6 @@ def plot_points(ground_truth, prediction, mode, epoch):
     image = PIL.Image.open(buf)
     image = transforms.ToTensor()(image).unsqueeze(0)
     tensorboard.add_image(f'Distance Correlation - {mode}', image[0], epoch)
-    #np.savetxt('plots/gps_{epoch}_{mode}', ground_truth, delimiter=",")
-    #np.savetxt('plots/embedding_{epoch}_{mode}', prediction, delimiter=",")
 
 """
 NETWORK
@@ -193,7 +192,45 @@ def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
     y = torch.sum(y)
     return y
 
+def dump_data(place_model, correlation_model, loader, epoch):
+    place_model.eval()
+    correlation_model.eval()
 
+    #avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
+    score = 0
+    for i, (input, target, gps_info) in enumerate(loader):     
+        nq = len(input) # number of training tuples
+        ni = len(input[0]) # number of images per tuple
+        gps_info = torch.tensor(gps_info)
+        
+        dist_lat = np.zeros(nq)
+        dist_gps = np.zeros(nq)
+        images = []
+
+        for q in range(nq):
+            output = torch.zeros(OUTPUT_DIM, ni).cuda()
+            for imi in range(ni):
+                # compute output vector for image imi
+                output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
+            loss = mse_loss(output, target[q].cuda(), gps_info[q])
+            score += loss
+        
+            dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+            D = D.cpu()
+            dist_lat[q] = D[0]
+            dist_gps[q] = dist
+            
+            q = loader.qImages[loader.qidxs[i]]
+            p = loader.dbImages[loader.pidxs[i]][0] #TODO: Revert GetItem Randomness for this to work
+            images.append([q,p])
+        
+        del output
+        break
+    np.savetxt(f'plots/gps_{epoch}', dist_gps, delimiter=",")
+    np.savetxt(f'plots/embedding_{epoch}', dist_lat, delimiter=",")
+    with open(f'plots/pictures_{epoch}.csv', "w") as f:
+        writer = csv.writer(f, dialect='excel')
+        writer.writerows(images)
 
 def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
@@ -223,7 +260,7 @@ def test(place_model, correlation_model, val_loader, epoch):
                 dist_lat[q] = D[0]
                 dist_gps[q] = dist
         
-        if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+        if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
             linear_regression(dist_gps, dist_lat, 'Training', epoch)
         
@@ -255,10 +292,6 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
             for q in range(nq):
-                
-                if i == 0 and (q % BATCH_SIZE == 0): #TODO: Change this way of selecting tuples
-                    log_tuple(input, q, epoch, i)
-
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
                     # compute output vector for image imi
@@ -269,12 +302,12 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 loss.backward()    
 
                 # Only for first batch
-                if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+                if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                     dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
                     D = D.cpu()
                     dist_lat[q] = D[0]
                     dist_gps[q] = dist
-            if i == 0 and (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+            if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                 average_dist = np.absolute(dist_gps - dist_lat)
                 tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
@@ -361,6 +394,7 @@ def main():
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
         print(f'====> {epoch}/{EPOCH}')
+        #dump_data(train_loader, model, net, criterion, optimizer, scheduler, epoch)
         train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
 
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
