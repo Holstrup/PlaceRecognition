@@ -29,7 +29,7 @@ PARAMS
 BATCH_SIZE = 500
 EPOCH = 100
 
-INPUT_DIM = 4098
+INPUT_DIM = 4096
 HIDDEN_DIM1 = 2048
 HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 512
@@ -176,11 +176,22 @@ def distances(x, label, gps, eps=1e-6):
         dist = distance(gps[0], gps[1])
     return dist, D, lbl
 
+#def mse_loss(x, label, gps, eps=1e-6, margin=25):
+#    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+#    y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+#    y = torch.sum(y)
+#    return y
+
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
-    dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
-    y = torch.sum(y)
-    return y
+    #dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    #y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    #y = torch.sum(y)
+    lbl = label[label!=-1]
+    distances = torch.zeros(len(gps[1:]))
+    for i, gps_i in enumerate(gps[1:]):
+        distances[i] = float(distance(gps[0], gps_i))
+    distances = distances.cuda()
+    return torch.sum(torch.pow(distances - x[1:],2))
 
 def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
@@ -247,19 +258,21 @@ def test(place_model, correlation_model, val_loader, epoch):
 
         for q in range(nq):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
+            query_emb = place_model(input[q][0].cuda()).squeeze()
             for imi in range(ni):
                 # compute output vector for image imi
-                output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
-            print(output)
-            loss = 1 #mse_loss(output, target[q].cuda(), gps_info[q])
+                im_emb = place_model(input[q][imi].cuda()).squeeze() 
+                query_im_concat = torch.cat((query_emb, im_emb), 0)
+                output[:, imi] = correlation_model(query_im_concat)
+            loss = mse_loss(output, target[q].cuda(), gps_info[q])
             score += loss
         
             # Only for first batch
             if i == 0:
-                dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-                D = D.cpu()
-                dist_lat[q] = D[0]
-                dist_gps[q] = dist
+                #dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+                D = output.cpu()
+                dist_lat[q] = D[0][1]
+                dist_gps[q] = float(distance(gps_info[q][0], gps_info[q][1])) #dist               
         
         if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
@@ -298,19 +311,19 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 for imi in range(ni):
                     # compute output vector for image imi
                     im_emb = place_model(input[q][imi].cuda()).squeeze()
-                    query_im_concat = torch.cat((query_emb, query_emb), 0)
+                    query_im_concat = torch.cat((query_emb, im_emb), 0)
                     output[:, imi] = correlation_model(query_im_concat)
-
+                
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 epoch_loss += loss
                 loss.backward()    
 
                 # Only for first batch
                 if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-                    dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-                    D = D.cpu()
-                    dist_lat[q] = D[0]
-                    dist_gps[q] = dist
+                    #dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
+                    D = output.cpu()
+                    dist_lat[q] = D[0][1]
+                    dist_gps[q] = float(distance(gps_info[q][0], gps_info[q][1])) #dist
             if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                 average_dist = np.absolute(dist_gps - dist_lat)
                 tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
