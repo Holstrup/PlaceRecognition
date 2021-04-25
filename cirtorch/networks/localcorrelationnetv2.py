@@ -186,12 +186,14 @@ def mse_loss(x, label, gps, eps=1e-6, margin=25):
     #dist, D, lbl = distances(x, label, gps, eps=1e-6)
     #y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     #y = torch.sum(y)
-    lbl = label[label!=-1]
-    distances = torch.zeros(len(gps[1:]))
-    for i, gps_i in enumerate(gps[1:]):
-        distances[i] = float(distance(gps[0], gps_i))
-    distances = distances.cuda()
-    return torch.sum(torch.pow(distances - x[1:],2))
+    #lbl = label[label!=-1]
+    #distances = torch.zeros(len(gps[1:]))
+    #for i, gps_i in enumerate(gps[1:]):
+        #distances[i] = float(distance(gps[0], gps_i))
+    #distances = distances.cuda()
+    true_dist = distance(gps[0], gps[1])
+    y = torch.pow(true_dist - x[1], 2)
+    return torch.sum(y)
 
 def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
@@ -315,6 +317,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     output[:, imi] = correlation_model(query_im_concat)
                 
                 loss = criterion(output, target[q].cuda(), gps_info[q])
+                print(f'=> Loss: {loss}')
                 epoch_loss += loss
                 loss.backward()    
 
