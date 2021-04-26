@@ -437,11 +437,20 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-        #gps_info = self.getGpsInformation(index, pos_index)
-        gps_info = self.positive_distances[index][pos_index].extend(self.distances[index])
+        pos_distance = self.getGpsInformation(index, pos_index)
+        gps_info = [pos_distance].extend(self.distances[index])
         return (output, target, gps_info)
 
     def getGpsInformation(self, index, pos_index):
+        gps_info = []
+        qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
+        pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
+        print(qid, pid)
+        print('>', self.gpsInfo.get(qid), self.gpsInfo.get(pid))
+        distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid))
+        return pos_distance
+
+    """def getGpsInformation(self, index, pos_index):
         gps_info = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
@@ -451,6 +460,7 @@ class TuplesDataset(data.Dataset):
             nid = self.dbImages[negative].split('/')[-1][:-4]
             gps_info.append(self.gpsInfo.get(nid))
         return gps_info
+        """
 
     def __len__(self):
         # if not self.qidxs:
