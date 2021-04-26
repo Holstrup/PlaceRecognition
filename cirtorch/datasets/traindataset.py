@@ -617,7 +617,7 @@ class TuplesDataset(data.Dataset):
             querycoordinates = torch.tensor([self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool], dtype=torch.float)
             poolcoordinates = torch.tensor([self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images], dtype=torch.float)
 
-            self.positive_distances = []
+            """self.positive_distances = []
             for i in range(len(self.qidxs)):
                 positives = self.pidxs[i]
                 query = querycoordinates[i]
@@ -625,7 +625,7 @@ class TuplesDataset(data.Dataset):
                 for pos in positives:
                     positive = querycoordinates[pos]
                     query_distances.append(distance(query, positive))
-                self.positive_distances.append(query_distances)
+                self.positive_distances.append(query_distances)"""
 
             # compute distances
             distances = torch.norm(querycoordinates[:, None] - poolcoordinates, dim=2)
