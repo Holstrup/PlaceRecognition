@@ -248,7 +248,7 @@ def logistically_weighted_contrastive_loss(x, label, gps, margin=0.7, eps=1e-6):
     return y
 
 def distance(query, positive):
-    return np.linalg.norm(np.array(query)-np.array(positive))
+    return torch.norm(query - positive, dim=-1)
 
 def triplet_loss(x, label, margin=0.1):
     # x is D x N
@@ -517,9 +517,12 @@ def contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, 
     D = D * alpha 
 
     smoothing = torch.zeros(len(lbl))
+    distances = torch.zeros(len(lbl))
     for i, gps_i in enumerate(gps[1:]):
+        distances[i] = np.clip(distance(gps[0], gps_i), a_min=0, a_max=None)
         smoothing[i] = np.clip(1 - distance(gps[0], gps_i)/50, a_min=0, a_max=None)        
     smoothing = smoothing.cuda()
+    print(distances, smoothing)
 
     y = 0.5*smoothing*torch.pow(D,2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
 

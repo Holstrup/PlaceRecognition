@@ -24,7 +24,7 @@ default_cities = {
 }
 
 default_cities_debug = {
-    'train': ["zurich"],
+    'train': ["zurich", "london"],
     'val': ["cph", "sf"],
     'test': ["miami"]
 }
@@ -437,7 +437,8 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-        gps_info = self.getGpsInformation(index)
+        #gps_info = self.getGpsInformation(index)
+        gps_info = self.distances[index]
         return (output, target, gps_info)
 
     def getGpsInformation(self, index):
@@ -613,6 +614,7 @@ class TuplesDataset(data.Dataset):
 
             # selection of negative examples
             self.nidxs = []
+            self.distances = []
 
             # Statistics
             avg_ndist = torch.tensor(0).float().cuda()  # for statistics
@@ -620,6 +622,7 @@ class TuplesDataset(data.Dataset):
 
             for q in range(len(self.qidxs)):
                 nidxs = []
+                dist_to_query = []
                 r = 0
                 while len(nidxs) < self.nnum:
                     #TODO: This will choose the same negatives every time (assuming the samples are the same)
@@ -638,6 +641,8 @@ class TuplesDataset(data.Dataset):
                         nidxs.append(potential)
                         avg_ndist += distances[q, r]
                         n_ndist += 1
+                        dist_to_query.append(distances[q, r])
                     r += 1
+                self.distances.append(dist_to_query)
                 self.nidxs.append(nidxs)
             return (avg_ndist/n_ndist).item() # return average negative gps distance
