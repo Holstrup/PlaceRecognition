@@ -43,8 +43,9 @@ source ~/hello_hpc/bin/activate
 ### echo $PWD
 ### pip3 install -r requirements.txt
 echo "Starting Training"
-python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'triplet'
-### python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'ContrastiveWeightedLossVariant'
-####python3 cirtorch/networks/localcorrelationnet.py
-### python3 cirtorch/networks/correlationnet.py
+###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'triplet' --loss-margin 0.1 --neg-num 1
+###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'ContrastiveWeightedLossVariant' --neg-num 6 --tuple-mining 'gps' --posDistThr 15 --negDistThr 15
+### python3 cirtorch/networks/localcorrelationnet.py
+###python3 cirtorch/networks/correlationnet.py
+python3 cirtorch/networks/localcorrelationnet.py
 echo "Finished Training"

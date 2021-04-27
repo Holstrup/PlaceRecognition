@@ -42,5 +42,5 @@ source ~/hello_hpc/bin/activate
 ### echo $PWD
 ### pip3 install -r requirements.txt
 echo "Starting Training"
-python3 -m cirtorch.examples.test_mapillary --network-path 'data/outputs/{}.pth.tar' --datasets 'mapillary'
+python3 -m cirtorch.examples.test_mapillary --network-path 'data/references/MSLS_resnet50_GeM_480_CL.pth' --datasets 'mapillary'
 echo "Finished Training"

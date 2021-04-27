@@ -33,16 +33,17 @@ INPUT_DIM = 4096
 HIDDEN_DIM1 = 2048
 HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 512
+HIDDEN_DIM4 = 256
 OUTPUT_DIM = 1
 
 LR = 0.01
 WD = 4e-3
 
-network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
+network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 imsize = 320
 
-posDistThr = 15
+posDistThr = 25
 negDistThr = 25
 workers = 8
 query_size = 2000
@@ -141,13 +142,15 @@ class CorrelationNet(torch.nn.Module):
         self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
         self.hidden12 = torch.nn.Dropout(p=0.2)
         self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
-        self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
+        self.hidden3 = torch.nn.Linear(HIDDEN_DIM3, HIDDEN_DIM4) 
+        self.output = torch.nn.Linear(HIDDEN_DIM4, OUTPUT_DIM)
 
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
         x = F.leaky_relu(self.hidden1(x))
         x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
+        x = F.leaky_relu(self.hidden3(x))
         x = self.output(x)
         return x
 
@@ -192,9 +195,7 @@ def mse_loss(x, label, gps, eps=1e-6, margin=25):
         #distances[i] = float(distance(gps[0], gps_i))
     #distances = distances.cuda()
     true_dist = distance(gps[0], gps[1])
-    y = torch.pow(true_dist - x[1], 2)
-    return torch.sum(y)
-
+    y = torch.pow(true_dist - x[0][1], 2)
 def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     if D[0] <= delta:
@@ -332,12 +333,11 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
                 linear_regression(dist_gps, dist_lat, 'Training', epoch)
+            optmizer.step()
+            optimizer.zero_grad()
+            scheduler.step()
     
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
-
-        optimizer.step()
-        optimizer.zero_grad()
-        scheduler.step()
         del output
 
 def main():

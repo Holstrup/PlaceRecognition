@@ -27,7 +27,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 100
+EPOCH = 200
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -38,7 +38,7 @@ OUTPUT_DIM = 2048
 LR = 0.01
 WD = 4e-3
 
-network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch38.pth.tar'
+network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 imsize = 320
 
@@ -170,15 +170,14 @@ def distances(x, label, gps, eps=1e-6):
 
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
-
     dist = 1
     if len(gps) > 0:
         dist = distance(gps[0], gps[1])
-    return dist, D, lbl
+    return gps, D, lbl
 
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((dist - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((gps[0] - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -218,19 +217,19 @@ def dump_data(place_model, correlation_model, loader, epoch):
             dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
             D = D.cpu()
             dist_lat[q] = D[0]
-            dist_gps[q] = dist
+            dist_gps[q] = dist[0]
             
-            q = loader.qImages[loader.qidxs[i]]
-            p = loader.dbImages[loader.pidxs[i]][0] #TODO: Revert GetItem Randomness for this to work
-            images.append([q,p])
+            #q = loader.qImages[loader.qidxs[i]]
+            #p = loader.dbImages[loader.pidxs[i]][0] #TODO: Revert GetItem Randomness for this to work
+            #images.append([q,p])
         
         del output
         break
     np.savetxt(f'plots/gps_{epoch}', dist_gps, delimiter=",")
     np.savetxt(f'plots/embedding_{epoch}', dist_lat, delimiter=",")
-    with open(f'plots/pictures_{epoch}.csv', "w") as f:
-        writer = csv.writer(f, dialect='excel')
-        writer.writerows(images)
+    #with open(f'plots/pictures_{epoch}.csv', "w") as f:
+        #writer = csv.writer(f, dialect='excel')
+        #writer.writerows(images)
 
 def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
@@ -258,7 +257,7 @@ def test(place_model, correlation_model, val_loader, epoch):
                 dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
                 D = D.cpu()
                 dist_lat[q] = D[0]
-                dist_gps[q] = dist
+                dist_gps[q] = dist[0]
         
         if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
             plot_points(dist_gps, dist_lat, 'Validation', epoch)
@@ -288,7 +287,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
         for i, (input, target, gps_info) in enumerate(train_loader):       
             nq = len(input) # number of training tuples
             ni = len(input[0]) # number of images per tuple
-            gps_info = torch.tensor(gps_info)
+            #gps_info = torch.tensor(gps_info)
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
             for q in range(nq):
@@ -306,7 +305,9 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                     dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
                     D = D.cpu()
                     dist_lat[q] = D[0]
-                    dist_gps[q] = dist
+                    dist_gps[q] = dist[0]
+            #if epoch % (EPOCH // 10) == 0:
+            #    dump_data(place_model, correlation_model, train_loader, epoch)
             if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
                 average_dist = np.absolute(dist_gps - dist_lat)
                 tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
@@ -344,28 +345,30 @@ def main():
         name='mapillary',
         mode='train',
         imsize=imsize,
-        nnum=0,
+        nnum=1,
         qsize=query_size,
         poolsize=pool_size,
         transform=transform,
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        cities='debug'
+        cities='debug', 
+        tuple_mining='gps'
     )
 
     val_dataset = TuplesDataset(
             name='mapillary',
             mode='val',
             imsize=imsize,
-            nnum=0,
+            nnum=1,
             qsize=float('Inf'),
             poolsize=float('Inf'),
             transform=transform,
-            posDistThr=negDistThr, # Use 25 meters for both pos and neg
+            posDistThr=posDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            cities='debug'
+            cities='debug',
+            tuple_mining='gps'
     )
 
     # Dataloaders
@@ -386,10 +389,10 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     criterion = mse_loss
-
-    avg_neg_distance = train_loader.dataset.create_epoch_tuples(model)
-    avg_neg_distance = val_loader.dataset.create_epoch_tuples(model)
-
+    print('Creating epoch tuples')
+    avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
+    avg_neg_distance = val_loader.dataset.epoch_tuples_gps(model)
+    print('Done')
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):

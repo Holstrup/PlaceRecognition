@@ -164,13 +164,14 @@ def main():
     negDistThr = 25
     test_dataset = TuplesDataset(
         name='mapillary',
-        #mode='test',
-        mode='train',
+        mode='test',
+        #mode='train',
         imsize=imsize,
         transform=transform,
         posDistThr=posDistThr,
         negDistThr=negDistThr,
-        tuple_mining='gps'
+        tuple_mining='gps',
+        cities='debug'
     )
     qidxs, pidxs = test_dataset.get_loaders()
 
@@ -222,7 +223,7 @@ def main():
         scores = scores.cpu().numpy()
         scores = np.transpose(scores)
 
-        if args.generate_plot:
+        if not args.generate_plot:
             print('>>> {}: Generating Correlation Data'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo
@@ -262,7 +263,7 @@ def main():
                 writer = csv.writer(f, dialect='excel')
                 writer.writerows(all_pics)
         
-        elif not args.generate_plot:
+        elif args.generate_plot:
             print('>>> {}: Generating Distance Plot'.format(dataset))
             gpsinfo = test_dataset.gpsInfo
             angleInfo = test_dataset.angleInfo

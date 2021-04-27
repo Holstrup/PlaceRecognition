@@ -223,7 +223,8 @@ class ContrastiveLossVariant(nn.Module):
         #loss = LF.contrastive_loss_mse_reference(x, label, margin=self.gpsmargin, eps=self.eps)
         #loss = LF.contrastive_loss_plus_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
         #loss, mse_loss = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
-        loss = LF.contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, smoothing=0.1)
+        loss, smoothing_factor = LF.contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, smoothing=0.1)
+        self.mse_loss = smoothing_factor
         return loss
 
     def __repr__(self):
@@ -234,9 +235,12 @@ class TripletLoss(nn.Module):
     def __init__(self, margin=0.1):
         super(TripletLoss, self).__init__()
         self.margin = margin
+        self.dist = 0
 
     def forward(self, x, label):
-        return LF.triplet_loss(x, label, margin=self.margin)
+        loss, dist = LF.triplet_loss(x, label, margin=self.margin)
+        self.dist = dist
+        return loss
 
     def __repr__(self):
         return self.__class__.__name__ + '(' + 'margin=' + '{:.4f}'.format(self.margin) + ')'

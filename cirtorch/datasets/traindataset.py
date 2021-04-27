@@ -438,17 +438,15 @@ class TuplesDataset(data.Dataset):
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
         pos_distance = self.getGpsInformation(index, pos_index)
-        gps_info = [pos_distance].extend(self.distances[index])
-        return (output, target, gps_info)
+        distances = [pos_distance]
+        distances.extend(self.distances[index])
+        return (output, target, distances)
 
     def getGpsInformation(self, index, pos_index):
         gps_info = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
-        print(qid, pid)
-        print('>', self.gpsInfo.get(qid), self.gpsInfo.get(pid))
-        distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid))
-        return pos_distance
+        return self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid))
 
     """def getGpsInformation(self, index, pos_index):
         gps_info = []
@@ -483,8 +481,8 @@ class TuplesDataset(data.Dataset):
     #def distance(self, query, positive):
     #    return np.linalg.norm(np.array(query)-np.array(positive))
 
-    def distance(query, positive):
-        return torch.norm(query - positive, dim=-1)
+    def distance(self, query, positive):
+        return torch.norm(torch.tensor(query) - torch.tensor(positive), dim=-1)
 
     def create_epoch_tuples(self, net):
         
