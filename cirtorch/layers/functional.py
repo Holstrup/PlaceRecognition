@@ -484,20 +484,19 @@ def contrastive_loss_mse(x, label, gps, margin=25, eps=1e-6, alpha=35):
     alpha = alpha.cuda()    
     D = D * alpha 
 
-    gps_dist = 1
-    if len(gps) > 0:
-        gps_dist = distance(gps[0], gps[1])
+    smoothing = torch.zeros(len(lbl))
+    for i, gps_i in enumerate(gps):
+        smoothing[i] = np.clip(1 - gps_i/50, a_min=0, a_max=None)        
+    smoothing = smoothing.cuda()
 
-    y = lbl * torch.pow(D - gps_dist, 2) 
-    mse_loss = y / (alpha**2)
-    y += 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)  
-
+    print(gps)
+    y = smoothing * torch.pow(D - gps, 2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
     y /= (alpha**2)
     y = torch.sum(y)
-    mse_loss = torch.sum(mse_loss)
-    return y, mse_loss
+    smoothing_factor = torch.sum(smoothing)
+    return y, smoothing_factor
 
-def contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, smoothing=0.1): 
+def generalized_contrastive_loss(x, label, gps, margin=25, eps=1e-6, alpha=35): 
     # Regular contrastive loss scaled up and then down again (sanity check)
 
     # x is D x N
@@ -520,9 +519,40 @@ def contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, 
     for i, gps_i in enumerate(gps):
         smoothing[i] = np.clip(1 - gps_i/50, a_min=0, a_max=None)        
     smoothing = smoothing.cuda()
-    print(gps, smoothing)
 
     y = 0.5*smoothing*torch.pow(D,2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
+
+    y /= (alpha**2)
+    y = torch.sum(y)
+    smoothing_factor = torch.sum(smoothing)
+    return y, smoothing_factor
+
+
+def smoothed_mse(x, label, gps, margin=25, eps=1e-6, alpha=35): 
+    # Regular contrastive loss scaled up and then down again (sanity check)
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+    alpha = torch.ones(lbl.size()) * alpha
+    alpha = alpha.cuda()    
+    D = D * alpha 
+
+    smoothing = torch.zeros(len(lbl))
+    for i, gps_i in enumerate(gps):
+        smoothing[i] = np.clip(1 - gps_i/50, a_min=0, a_max=None)        
+    smoothing = smoothing.cuda()
+
+    y = 0.5*smoothing*torch.pow(D,2)
 
     y /= (alpha**2)
     y = torch.sum(y)

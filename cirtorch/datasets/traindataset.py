@@ -437,16 +437,18 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-        pos_distance = self.getGpsInformation(index, pos_index)
-        distances = [pos_distance]
-        distances.extend(self.distances[index])
+        distances = self.getGpsInformation(index, pos_index)
         return (output, target, distances)
 
     def getGpsInformation(self, index, pos_index):
-        gps_info = []
+        distances = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
-        return self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid))
+        distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid)))
+        for negative in self.nidxs[index]:
+            nid = self.dbImages[negative].split('/')[-1][:-4]
+            distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(nid)))
+        return distances
 
     """def getGpsInformation(self, index, pos_index):
         gps_info = []
@@ -488,6 +490,8 @@ class TuplesDataset(data.Dataset):
         
         if self.tuple_mining == 'default':
             return self.epoch_tuples_standard(net)
+        elif self.tuple_mining == 'semihard':
+            return self.epoch_tuples_semihard(net)
         else:
             return self.epoch_tuples_gps(net)
 
@@ -665,3 +669,105 @@ class TuplesDataset(data.Dataset):
                 self.distances.append(dist_to_query)
                 self.nidxs.append(nidxs)
             return (avg_ndist/n_ndist).item() # return average negative gps distance
+
+
+    def epoch_tuples_semihard(self, net):
+
+        print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
+        print(">>>> used network: ")
+        print(net.meta_repr())
+
+        ## ------------------------
+        ## SELECTING POSITIVE PAIRS
+        ## ------------------------
+
+        # draw qsize random queries for tuples
+        idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
+        self.qidxs = [self.qpool[i] for i in idxs2qpool]
+        self.pidxs = [np.random.choice((self.ppool[i]), 1) for i in idxs2qpool]
+
+        ## ------------------------
+        ## SELECTING NEGATIVE PAIRS
+        ## ------------------------
+
+        # if nnum = 0 create dummy nidxs
+        # useful when only positives used for training
+        if self.nnum == 0:
+            self.nidxs = [[] for _ in range(len(self.qidxs))]
+            return 0
+
+        # draw poolsize random images for pool of negatives images
+        idxs2images = torch.randperm(len(self.ppool))[:self.poolsize]
+
+        # prepare network
+        net.cuda()
+        net.eval()
+
+        # no gradients computed, to reduce memory and increase speed
+        with torch.no_grad():
+
+            print('>> Extracting descriptors for query images...')
+            opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
+            loader = torch.utils.data.DataLoader(
+                ImagesFromList(root='', images=[self.qImages[i] for i in self.qidxs], imsize=self.imsize, transform=self.transform),
+                **opt)
+
+            # extract query vectors
+            qvecs = torch.zeros(net.meta['outputdim'], len(self.qidxs)).cuda()
+            for i, input in enumerate(loader):
+                qvecs[:, i] = net(input.cuda()).data.squeeze()
+                if (i+1) % self.print_freq == 0 or (i+1) == len(self.qidxs):
+                    print('\r>>>> {}/{} done...'.format(i+1, len(self.qidxs)), end='')
+
+            
+            # prepare negative pool data loader
+            print('>> Extracting descriptors for negative pool...')
+            opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
+            loader = torch.utils.data.DataLoader(
+                ImagesFromList(root='', images=[self.dbImages[i] for i in idxs2images], imsize=self.imsize, transform=self.transform),
+                **opt
+            )
+
+            # extract negative pool vectors
+            poolvecs = torch.zeros(net.meta['outputdim'], len(idxs2images)).cuda()
+            for i, input in enumerate(loader):
+                poolvecs[:, i] = net(input.cuda()).data.squeeze()
+                if (i+1) % self.print_freq == 0 or (i+1) == len(idxs2images):
+                    print('\r>>>> {}/{} done...'.format(i+1, len(idxs2images)), end='')
+
+            print('>> Searching for semi hard negatives...')
+            # compute dot product scores and ranks on GPU
+            scores = torch.mm(poolvecs.t(), qvecs)
+            scores, ranks = torch.sort(scores, dim=0, descending=True)
+            avg_ndist = torch.tensor(0).float().cuda()  # for statistics
+            n_ndist = torch.tensor(0).float().cuda()  # for statistics
+            # selection of negative examples
+            self.nidxs = []
+
+            for q in range(len(self.qidxs)):
+                # do not use query cluster, those images are potentially positive
+                nidxs = []
+                clusters = []
+                r = 0
+                if self.mode == 'train':
+                    clusters = self.clusters[idxs2qpool[q]]
+
+                pos_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[self.pidxs[q], q]]+1e-6, 2).sum(dim=0).sqrt()
+                 
+                while len(nidxs) < self.nnum:
+                    potential = int(idxs2images[ranks[r, q]])
+                    neg_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
+                    
+                    # take at most one image from the same cluster
+                    print(neg_dist, pos_dist)
+                    if (potential not in clusters) and (potential not in self.pidxs[q]) and (neg_dist > pos_dist):
+                        nidxs.append(potential)
+                        clusters = np.append(clusters, np.array(potential))
+                        avg_ndist += neg_dist
+                        n_ndist += 1
+                    r += 1
+                self.nidxs.append(nidxs)
+                
+            print('>>>> Average negative l2-distance: {:.2f}'.format(avg_ndist/n_ndist))
+            print('>>>> Done')
+        return (avg_ndist/n_ndist).item()  # return average negative l2-distance

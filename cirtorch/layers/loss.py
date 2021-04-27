@@ -222,8 +222,13 @@ class ContrastiveLossVariant(nn.Module):
     def forward(self, x, label, gps=[]):
         #loss = LF.contrastive_loss_mse_reference(x, label, margin=self.gpsmargin, eps=self.eps)
         #loss = LF.contrastive_loss_plus_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
-        #loss, mse_loss = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
-        loss, smoothing_factor = LF.contrastive_loss_mse_smoothed(x, label, gps, margin=25, eps=1e-6, alpha=35, smoothing=0.1)
+        
+        #TODO: Exp 1
+        loss, smoothing_factor = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
+        #TODO: Exp 2
+        #loss, smoothing_factor = LF.generalized_contrastive_loss(x, label, gps, margin=25, eps=1e-6, alpha=35)
+        #TODO: Exp 3
+        #loss, smoothing_factor = LF.smoothed_mse(x, label, gps, margin=25, eps=1e-6, alpha=35)
         self.mse_loss = smoothing_factor
         return loss
 
