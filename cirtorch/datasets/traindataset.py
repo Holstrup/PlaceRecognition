@@ -685,7 +685,6 @@ class TuplesDataset(data.Dataset):
         idxs2qpool = torch.randperm(len(self.qpool))[:self.qsize]
         self.qidxs = [self.qpool[i] for i in idxs2qpool]
         self.pidxs = [np.random.choice((self.ppool[i]), 1) for i in idxs2qpool]
-
         ## ------------------------
         ## SELECTING NEGATIVE PAIRS
         ## ------------------------
@@ -752,15 +751,15 @@ class TuplesDataset(data.Dataset):
                 if self.mode == 'train':
                     clusters = self.clusters[idxs2qpool[q]]
 
-                pos_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[self.pidxs[q], q]]+1e-6, 2).sum(dim=0).sqrt()
+                pos_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[self.pidxs[q][0], q]]+1e-6, 2).sum(dim=0).sqrt()
                  
                 while len(nidxs) < self.nnum:
                     potential = int(idxs2images[ranks[r, q]])
                     neg_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
-                    
+                    print(self.pidxs[q], ranks[self.pidxs[q][0], q]) 
                     # take at most one image from the same cluster
-                    print(neg_dist, pos_dist)
-                    if (potential not in clusters) and (potential not in self.pidxs[q]) and (neg_dist > pos_dist):
+                    print(neg_dist, pos_dist.size())
+                    if (potential not in clusters) and ((potential not in self.pidxs[q]) and (neg_dist > pos_dist)):
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))
                         avg_ndist += neg_dist
