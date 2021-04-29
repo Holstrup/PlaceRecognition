@@ -439,20 +439,19 @@ def train(train_loader, model, criterion, optimizer, epoch):
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         gps_info = torch.tensor(gps_info)
-        
         for q in range(nq):
             if i % 400 == 0:
                 batchid = 400 * epoch + i 
 
                 # Calculate positive distance
-                dist = distance(gps_info[q][0], gps_info[q][1])
-                writer.add_scalar('GPSDistance/Postive', dist, batchid)
+                #dist = distance(gps_info[q][0], gps_info[q][1])
+                writer.add_scalar('GPSDistance/Postive', gps_info[q], batchid)
 
                 # Calculate hardest negative distance
-                dist = distance(gps_info[q][0], gps_info[q][2])
-                writer.add_scalar('GPSDistance/HardestNegative', dist, batchid)
+                #dist = distance(gps_info[q][0], gps_info[q][2])
+                #writer.add_scalar('GPSDistance/HardestNegative', dist, batchid)
 
-                if dist < 100: # meters
+                if gps_info[0] < 5: # meters
                     mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
                     std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
                     images = input[q][0] * std + mean
