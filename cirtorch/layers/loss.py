@@ -225,10 +225,71 @@ class ContrastiveLossVariant(nn.Module):
         
         #TODO: Exp 1
         loss, smoothing_factor = LF.contrastive_loss_mse(x, label, gps, eps=self.eps, margin=self.gpsmargin, alpha=self.margin, beta=self.beta)
-        #TODO: Exp 2
-        #loss, smoothing_factor = LF.generalized_contrastive_loss(x, label, gps, margin=25, eps=1e-6, alpha=35)
+
         #TODO: Exp 3
         #loss, smoothing_factor = LF.smoothed_mse(x, label, gps, margin=25, eps=1e-6, alpha=35)
+        self.mse_loss = smoothing_factor
+        return loss
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' + 'margin=' + '{:.4f}'.format(self.margin) + ')'
+
+class GeneralizedContrastiveLoss(nn.Module):
+    r"""CONTRASTIVELOSS layer that computes contrastive loss for a batch of images:
+        Q query tuples, each packed in the form of (q,p,n1,..nN)
+
+    Args:
+        x: tuples arranges in columns as [q,p,n1,nN, ... ]
+        label: -1 for query, 1 for corresponding positive, 0 for corresponding negative
+        margin: contrastive loss margin. Default: 0.7
+
+    >>> contrastive_loss = ContrastiveLoss(margin=0.7)
+    >>> input = torch.randn(128, 35, requires_grad=True)
+    >>> label = torch.Tensor([-1, 1, 0, 0, 0, 0, 0] * 5)
+    >>> output = contrastive_loss(input, label)
+    >>> output.backward()
+    """
+
+    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=25, beta=1.0):
+        super(GeneralizedContrastiveLoss, self).__init__()
+        self.margin = gpsmargin / margin
+        self.gpsmargin = gpsmargin
+        self.eps = eps
+        self.mse_loss = 0
+
+    def forward(self, x, label, gps=[]):
+        loss, smoothing_factor = LF.generalized_contrastive_loss(x, label, gps, margin=25, eps=1e-6, alpha=35)
+        self.mse_loss = smoothing_factor
+        return loss
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' + 'margin=' + '{:.4f}'.format(self.margin) + ')'
+
+class GeneralizedMSELoss(nn.Module):
+    r"""CONTRASTIVELOSS layer that computes contrastive loss for a batch of images:
+        Q query tuples, each packed in the form of (q,p,n1,..nN)
+
+    Args:
+        x: tuples arranges in columns as [q,p,n1,nN, ... ]
+        label: -1 for query, 1 for corresponding positive, 0 for corresponding negative
+        margin: contrastive loss margin. Default: 0.7
+
+    >>> contrastive_loss = ContrastiveLoss(margin=0.7)
+    >>> input = torch.randn(128, 35, requires_grad=True)
+    >>> label = torch.Tensor([-1, 1, 0, 0, 0, 0, 0] * 5)
+    >>> output = contrastive_loss(input, label)
+    >>> output.backward()
+    """
+
+    def __init__(self, margin=0.7, eps=1e-6, gpsmargin=25, beta=1.0):
+        super(GeneralizedMSELoss, self).__init__()
+        self.margin = gpsmargin / margin
+        self.gpsmargin = gpsmargin
+        self.eps = eps
+        self.mse_loss = 0
+
+    def forward(self, x, label, gps=[]):
+        loss, smoothing_factor = LF.generalized_contrastive_mse_loss(x, label, gps, margin=25, eps=1e-6, alpha=35)
         self.mse_loss = smoothing_factor
         return loss
 

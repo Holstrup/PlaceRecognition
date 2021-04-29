@@ -450,18 +450,6 @@ class TuplesDataset(data.Dataset):
             distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(nid)))
         return distances
 
-    """def getGpsInformation(self, index, pos_index):
-        gps_info = []
-        qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
-        pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
-        gps_info.append(self.gpsInfo.get(qid))
-        gps_info.append(self.gpsInfo.get(pid))
-        for negative in self.nidxs[index]:
-            nid = self.dbImages[negative].split('/')[-1][:-4]
-            gps_info.append(self.gpsInfo.get(nid))
-        return gps_info
-        """
-
     def __len__(self):
         # if not self.qidxs:
         #     return 0
