@@ -445,8 +445,10 @@ class TuplesDataset(data.Dataset):
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
         distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid)))
-        for negative in self.nidxs[index]:
-            nid = self.dbImages[negative].split('/')[-1][:-4]
+        for i in range(len(self.nidxs[index])):
+            nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
+            #if index == 4:
+            #    print(qid, nid, self.gpsInfo.get(qid), self.gpsInfo.get(nid))
             distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(nid)))
         return distances
 
@@ -604,7 +606,7 @@ class TuplesDataset(data.Dataset):
                 return 0
 
             # get query and pool coordinates
-            querycoordinates = torch.tensor([self.gpsInfo[self.qImages[i][-26:-4]] for i in idxs2qpool], dtype=torch.float)
+            querycoordinates = torch.tensor([self.gpsInfo[self.qImages[i][-26:-4]] for i in self.qidxs], dtype=torch.float)
             poolcoordinates = torch.tensor([self.gpsInfo[self.dbImages[i][-26:-4]] for i in idxs2images], dtype=torch.float)
 
             """self.positive_distances = []
@@ -630,7 +632,6 @@ class TuplesDataset(data.Dataset):
             # Statistics
             avg_ndist = torch.tensor(0).float().cuda()  # for statistics
             n_ndist = torch.tensor(0).float().cuda()  # for statistics
-
             for q in range(len(self.qidxs)):
                 nidxs = []
                 dist_to_query = []
@@ -639,10 +640,10 @@ class TuplesDataset(data.Dataset):
                     #TODO: This will choose the same negatives every time (assuming the samples are the same)
                     # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
                     if (len(nidxs) < self.nnum // 2):
-                        potential = idxs2images[indicies[q, r]] 
+                        potential = int(idxs2images[indicies[q, r]]) 
                     else:
                         r = random.randint(len(nidxs), len(idxs2images)-1)
-                        potential = idxs2images[indicies[q, r]]
+                        potential = int(idxs2images[indicies[q, r]])
                     
                     #TODO: Do we still need the cluster information? 
                     # An advantage could be, that we can 'diversify' the negatives a bit more because we exclude images from its cluster 
