@@ -170,14 +170,11 @@ def distances(x, label, gps, eps=1e-6):
 
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
-    dist = 1
-    if len(gps) > 0:
-        dist = distance(gps[0], gps[1])
     return gps, D, lbl
 
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((gps[0] - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((gps - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -281,13 +278,13 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
         place_model.eval()
         correlation_model.train()
         
-        #avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
+        if (epoch % 5 == 0) and (epoch != 0): # Shuffle tuples every x epochs 
+            avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
         
         epoch_loss = 0
         for i, (input, target, gps_info) in enumerate(train_loader):       
             nq = len(input) # number of training tuples
             ni = len(input[0]) # number of images per tuple
-            #gps_info = torch.tensor(gps_info)
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
             for q in range(nq):
@@ -345,7 +342,7 @@ def main():
         name='mapillary',
         mode='train',
         imsize=imsize,
-        nnum=1,
+        nnum=0,
         qsize=query_size,
         poolsize=pool_size,
         transform=transform,
@@ -360,7 +357,7 @@ def main():
             name='mapillary',
             mode='val',
             imsize=imsize,
-            nnum=1,
+            nnum=0,
             qsize=float('Inf'),
             poolsize=float('Inf'),
             transform=transform,
