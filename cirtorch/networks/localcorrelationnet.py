@@ -108,6 +108,7 @@ def linear_regression(ground_truth, prediction, mode, epoch):
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
+    plt.scatter(ground_truth, ground_truth, color = "green", alpha=0.2)
     
     x = np.linspace(0, 25, 25)
     y = x
@@ -233,8 +234,6 @@ def dump_data(place_model, correlation_model, loader, epoch):
 def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
     correlation_model.eval()
-    if (epoch % 10 == 0) and (epoch != 0):
-        avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
     score = 0
     for i, (input, target, gps_info) in enumerate(val_loader):     
         nq = len(input) # number of training tuples
@@ -280,8 +279,8 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
         place_model.eval()
         correlation_model.train()
         
-        if (epoch % 5 == 0) and (epoch != 0): # Shuffle tuples every x epochs 
-            avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
+        #if (epoch % 5 == 0) and (epoch != 0): # Shuffle tuples every x epochs 
+        avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
         
         epoch_loss = 0
         for i, (input, target, gps_info) in enumerate(train_loader):       
@@ -388,10 +387,9 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     criterion = mse_loss
-    print('Creating epoch tuples')
+    
     avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
     avg_neg_distance = val_loader.dataset.epoch_tuples_gps(model)
-    print('Done')
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
