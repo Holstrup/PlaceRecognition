@@ -27,11 +27,11 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 200
+EPOCH = 400
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
-HIDDEN_DIM2 = 512
+HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 1024
 OUTPUT_DIM = 2048
 
@@ -141,6 +141,7 @@ class CorrelationNet(torch.nn.Module):
         self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
         self.hidden12 = torch.nn.Dropout(p=0.2)
         self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
+        self.hidden2o = torch.nn.Dropout(p=0.2)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
@@ -148,6 +149,7 @@ class CorrelationNet(torch.nn.Module):
         x = F.leaky_relu(self.hidden1(x))
         x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
+        x = self.hidden2o(x)
         x = self.output(x)
         return x
 
@@ -174,7 +176,7 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((gps - D),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((D - gps[0]),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -208,12 +210,12 @@ def dump_data(place_model, correlation_model, loader, epoch):
             for imi in range(ni):
                 # compute output vector for image imi
                 output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
-            loss = mse_loss(output, target[q].cuda(), gps_info[q])
+            loss = mse_loss(output, target[q].cuda(), gps_info[q].cuda())
             score += loss
         
             dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
             D = D.cpu()
-            dist_lat[q] = D[0]
+            dist_lat[q] = gps_info[q][0]
             dist_gps[q] = dist[0]
             
             #q = loader.qImages[loader.qidxs[i]]
@@ -231,8 +233,8 @@ def dump_data(place_model, correlation_model, loader, epoch):
 def test(place_model, correlation_model, val_loader, epoch):
     place_model.eval()
     correlation_model.eval()
-
-    #avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
+    if (epoch % 10 == 0) and (epoch != 0):
+        avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_model) 
     score = 0
     for i, (input, target, gps_info) in enumerate(val_loader):     
         nq = len(input) # number of training tuples
@@ -397,7 +399,7 @@ def main():
         #dump_data(train_loader, model, net, criterion, optimizer, scheduler, epoch)
         train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
 
-        if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
                 test(model, net, val_loader, epoch)
             
