@@ -70,6 +70,21 @@ parser.add_argument('--generate-plot', default=False, type=bool, metavar='PLOT',
 parser.add_argument('--gpu-id', '-g', default='0', metavar='N',
                     help="gpu id used for testing (default: '0')")
 
+visualisation = {}
+
+def hook_fn(m, i, o):
+  visualisation[m] = o 
+
+def get_all_layers(net):
+  for name, layer in net._modules.items():
+    #If it is a sequential, don't register a hook on it
+    # but recursively register hook on all it's module children
+    if isinstance(layer, torch.nn.Sequential):
+      get_all_layers(layer)
+    else:
+      # it's a non sequential. Register a hook
+      layer.register_forward_hook(hook_fn)
+
 def main():
     args = parser.parse_args()
     imsize = args.image_size
@@ -198,10 +213,14 @@ def main():
         qLoader = torch.utils.data.DataLoader(
                 ImagesFromList(root='', images=[test_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
                 **opt)
+        
+        get_all_layers(net)
 
         qvecs = torch.zeros(net.meta['outputdim'], len(qidxs)).cuda()
         for i, input in enumerate(qLoader):
             qvecs[:, i] = net(input.cuda()).data.squeeze()
+        
+        print('Visualization keys: ', len(visualisation.keys()))
         
         # GPS: get query and pool coordinates
         querycoordinates = torch.tensor([test_dataset.gpsInfo[test_dataset.qImages[i][-26:-4]] for i in qidxs], dtype=torch.float)
