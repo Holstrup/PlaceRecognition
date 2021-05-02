@@ -221,6 +221,11 @@ def main():
             qvecs[:, i] = net(input.cuda()).data.squeeze()
         
         print('Visualization keys: ', len(visualisation.keys()))
+        for i, tensor in enumerate(visualisation.keys()):
+            vec = tensor.cpu().numpy()
+            print(f'SHAPE OF VEC {i}: {np.size(vec)}')
+            np.savetxt(f'Vec_{i}', vec, delimiter=',')
+
         
         # GPS: get query and pool coordinates
         querycoordinates = torch.tensor([test_dataset.gpsInfo[test_dataset.qImages[i][-26:-4]] for i in qidxs], dtype=torch.float)
