@@ -28,7 +28,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 400
+EPOCH = 100
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -141,17 +141,17 @@ class CorrelationNet(torch.nn.Module):
         super(CorrelationNet, self).__init__()
         self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
         self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
-        self.hidden12 = torch.nn.Dropout(p=0.2)
+        #self.hidden12 = torch.nn.Dropout(p=0.2)
         self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
-        self.hidden2o = torch.nn.Dropout(p=0.2)
+        #self.hidden2o = torch.nn.Dropout(p=0.2)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
         x = F.leaky_relu(self.hidden1(x))
-        x = self.hidden12(x)
+        #x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
-        x = self.hidden2o(x)
+        #x = self.hidden2o(x)
         x = self.output(x)
         return x
 
@@ -178,7 +178,8 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((D - gps[0]),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    gps = gps.cuda()
+    y = lbl*torch.pow((D - gps),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -300,7 +301,9 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 
                 if q == log_image:
                     log_tuple(input[q], epoch + i, gps_info[q])
-                loss = criterion(output, target[q].cuda(), gps_info[q])
+
+                gps_out = torch.tensor(gps_info[q])
+                loss = criterion(output, target[q].cuda(), gps_out)
                 epoch_loss += loss
                 loss.backward()    
 
