@@ -14,6 +14,7 @@ import io
 import PIL
 import math
 import csv
+import random
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -264,14 +265,16 @@ def test(place_model, correlation_model, val_loader, epoch):
         del output
     tensorboard.add_scalar('Loss/validation', score, epoch)
 
-def log_tuple(input, q, epoch, i):
+def log_tuple(input, batchid, gps_info):
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
     std = torch.tensor([0.229, 0.224, 0.225]).view(3,1,1)
-    images = input[q][0] * std + mean
-    for image_tensor in input[q][1:]:
+    images = input[0] * std + mean
+    distance_string = ''
+    for i, image_tensor in enumerate(input[1:]):
         new_image = image_tensor * std + mean
         images = torch.cat([images, new_image], dim=0)
-        tensorboard.add_images('ImageBatch: {}'.format(epoch + i), images, 0)
+        distance_string += '_' + str(round(gps_info[i], 1))
+    tensorboard.add_images('Batch_{}{}'.format(batchid, distance_string), images, 0)
 
 
 # Train loop
@@ -288,12 +291,15 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
             ni = len(input[0]) # number of images per tuple
             dist_lat = np.zeros(nq)
             dist_gps = np.zeros(nq)
+            log_image = random.randint(0,nq - 1)
             for q in range(nq):
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
                     # compute output vector for image imi
                     output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
-
+                
+                if q == log_image:
+                    log_tuple(input[q], epoch + i, gps_info[q])
                 loss = criterion(output, target[q].cuda(), gps_info[q])
                 epoch_loss += loss
                 loss.backward()    
