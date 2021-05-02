@@ -425,7 +425,6 @@ class TuplesDataset(data.Dataset):
         # positive image
         pos_index = random.randint(0, len(self.dbImages[self.pidxs[index]])-1)
         output.append(self.loader(self.dbImages[self.pidxs[index]][pos_index])) 
-
         # negative images
         for i in range(len(self.nidxs[index])):
             output.append(self.loader(self.dbImages[self.nidxs[index][i]]))
@@ -664,9 +663,6 @@ class TuplesDataset(data.Dataset):
 
         print('>> Creating tuples for an epoch of {}-{}...'.format(self.name, self.mode))
         print(">>>> used network: ")
-        print(net.meta_repr())
-
-        ## ------------------------
         ## SELECTING POSITIVE PAIRS
         ## ------------------------
 
@@ -706,7 +702,19 @@ class TuplesDataset(data.Dataset):
                 qvecs[:, i] = net(input.cuda()).data.squeeze()
                 if (i+1) % self.print_freq == 0 or (i+1) == len(self.qidxs):
                     print('\r>>>> {}/{} done...'.format(i+1, len(self.qidxs)), end='')
+            
+            print('>> Extracting descriptors for positive images...')
+            opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
+            loader = torch.utils.data.DataLoader(
+                ImagesFromList(root='', images=[self.dbImages[i[0]] for i in self.pidxs], imsize=self.imsize, transform=self.transform),
+                **opt)
 
+            # extract query vectors
+            pvecs = torch.zeros(net.meta['outputdim'], len(self.pidxs)).cuda()
+            for i, input in enumerate(loader):
+                pvecs[:, i] = net(input.cuda()).data.squeeze()
+                if (i+1) % self.print_freq == 0 or (i+1) == len(self.pidxs):
+                    print('\r>>>> {}/{} done...'.format(i+1, len(self.pidxs)), end='')
             
             # prepare negative pool data loader
             print('>> Extracting descriptors for negative pool...')
@@ -731,7 +739,6 @@ class TuplesDataset(data.Dataset):
             n_ndist = torch.tensor(0).float().cuda()  # for statistics
             # selection of negative examples
             self.nidxs = []
-
             for q in range(len(self.qidxs)):
                 # do not use query cluster, those images are potentially positive
                 nidxs = []
@@ -739,15 +746,11 @@ class TuplesDataset(data.Dataset):
                 r = 0
                 if self.mode == 'train':
                     clusters = self.clusters[idxs2qpool[q]]
-
-                pos_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[self.pidxs[q][0], q]]+1e-6, 2).sum(dim=0).sqrt()
-                 
+                pos_dist = torch.pow(qvecs[:,q]-pvecs[:,q]+1e-6, 2).sum(dim=0).sqrt()
                 while len(nidxs) < self.nnum:
                     potential = int(idxs2images[ranks[r, q]])
                     neg_dist = torch.pow(qvecs[:,q]-poolvecs[:,ranks[r, q]]+1e-6, 2).sum(dim=0).sqrt()
-                    print(self.pidxs[q], ranks[self.pidxs[q][0], q]) 
                     # take at most one image from the same cluster
-                    print(neg_dist, pos_dist.size())
                     if (potential not in clusters) and ((potential not in self.pidxs[q]) and (neg_dist > pos_dist)):
                         nidxs.append(potential)
                         clusters = np.append(clusters, np.array(potential))

@@ -304,8 +304,7 @@ class TripletLoss(nn.Module):
         self.dist = 0
 
     def forward(self, x, label):
-        loss, dist = LF.triplet_loss(x, label, margin=self.margin)
-        self.dist = dist
+        loss = LF.triplet_loss(x, label, margin=self.margin)
         return loss
 
     def __repr__(self):

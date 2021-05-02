@@ -517,7 +517,7 @@ def generalized_contrastive_loss(x, label, gps, margin=25, eps=1e-6, alpha=35):
 
     smoothing = torch.zeros(len(lbl))
     for i, gps_i in enumerate(gps):
-        smoothing[i] = np.clip(1 - gps_i/50, a_min=0, a_max=None)        
+        smoothing[i] = torch.clamp(1 - gps_i/50, min=0)        
     smoothing = smoothing.cuda()
 
     y = 0.5*smoothing*torch.pow(D,2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
@@ -550,6 +550,7 @@ def generalized_contrastive_mse_loss(x, label, gps, margin=25, eps=1e-6, alpha=3
     for i, gps_i in enumerate(gps):
         smoothing[i] = torch.clamp(1 - gps_i/50, min=0)        
     smoothing = smoothing.cuda()
+    print(D, gps)
     y = 0.5*smoothing*torch.pow(D - gps,2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
 
     y /= (alpha**2)

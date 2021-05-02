@@ -358,7 +358,6 @@ def main():
         global_epoch = epoch
         print('> Starting Epoch {}/{}'.format(start_epoch, args.epochs))
         epoch_start = time.time()
-
         # set manual seeds per epoch
         np.random.seed(epoch)
         torch.manual_seed(epoch)
@@ -538,18 +537,16 @@ def validate(val_loader, model, criterion, epoch):
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
         output = torch.zeros(model.meta['outputdim'], nq*ni).cuda()
-
         for q in range(nq):
             for imi in range(ni):
-
-                # compute output vector for image imi of query q
                 output[:, q*ni + imi] = model(input[q][imi].cuda()).squeeze()
             
         # no need to reduce memory consumption (no backward pass):
         # compute loss for the full batch
         #TODO: Fix loss func to be able to take a batch - For now using contrastive loss
-        # gps_info = torch.tensor(gps_info)
-        loss = criterion(output, torch.cat(target).cuda())
+        gps_info = torch.tensor(gps_info)
+        gps_out = torch.flatten(gps_info)
+        loss = criterion(output, torch.cat(target).cuda(), gps_out.cuda())
 
         # record loss
         losses.update(loss.item()/nq, nq)
