@@ -21,6 +21,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
+from cirtorch.layers.normalization import L2N
 
 torch.manual_seed(1)
 
@@ -36,15 +37,15 @@ HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 1024
 OUTPUT_DIM = 2048
 
-LR = 0.01
+LR = 0.005 #TODO: Lower Learning Rate
 WD = 4e-3
 
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 imsize = 320
 
-posDistThr = 15
-negDistThr = 25
+posDistThr = 50 #TODO: Try higher range 
+negDistThr = 50
 workers = 8
 query_size = 2000
 pool_size = 20000
@@ -136,6 +137,13 @@ def plot_points(ground_truth, prediction, mode, epoch):
 """
 NETWORK
 """
+
+INPUT_DIM = 2048
+HIDDEN_DIM1 = 1024
+HIDDEN_DIM2 = 1024
+HIDDEN_DIM3 = 1024
+OUTPUT_DIM = 2048
+
 class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
@@ -153,6 +161,7 @@ class CorrelationNet(torch.nn.Module):
         x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
+        x = L2N(x)
         return x
 
 """
@@ -179,7 +188,7 @@ def distances(x, label, gps, eps=1e-6):
 def mse_loss(x, label, gps, eps=1e-6, margin=25):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     gps = gps.cuda()
-    y = lbl*torch.pow((D - gps),2) #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((D - gps),2) #TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -274,7 +283,7 @@ def log_tuple(input, batchid, gps_info):
     for i, image_tensor in enumerate(input[1:]):
         new_image = image_tensor * std + mean
         images = torch.cat([images, new_image], dim=0)
-        distance_string += '_' + str(round(gps_info[i], 1))
+        distance_string += '_' + str(round(gps_info[i].item(), 1))
     tensorboard.add_images('Batch_{}{}'.format(batchid, distance_string), images, 0)
 
 
