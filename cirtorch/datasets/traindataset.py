@@ -446,8 +446,6 @@ class TuplesDataset(data.Dataset):
         distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(pid)))
         for i in range(len(self.nidxs[index])):
             nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
-            #if index == 4:
-            #    print(qid, nid, self.gpsInfo.get(qid), self.gpsInfo.get(nid))
             distances.append(self.distance(self.gpsInfo.get(qid), self.gpsInfo.get(nid)))
         return distances
 
