@@ -21,8 +21,8 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
-from cirtorch.layers.normalization import L2N
-
+#from cirtorch.layers.normalization import L2N
+import cirtorch.layers.functional as LF
 torch.manual_seed(1)
 
 """
@@ -110,11 +110,11 @@ def linear_regression(ground_truth, prediction, mode, epoch):
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color = "blue", alpha=0.2)
-    plt.scatter(ground_truth, ground_truth, color = "green", alpha=0.2)
+    plt.scatter(ground_truth, ground_truth / posDistThr, color = "green", alpha=0.2)
     
-    x = np.linspace(0, 25, 25)
-    y = x
-    plt.plot(x, y, color = "green")
+    #x = np.linspace(0, 25, 25)
+    #y = x
+    #plt.plot(x, y, color = "green")
 
     model = linear_regression(ground_truth, prediction, mode, epoch)
     x = np.linspace(0, 25, 25)
@@ -157,11 +157,11 @@ class CorrelationNet(torch.nn.Module):
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
         x = F.leaky_relu(self.hidden1(x))
+        x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
-        x = L2N(x)
         return x
 
 """
@@ -185,10 +185,10 @@ def distances(x, label, gps, eps=1e-6):
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     return gps, D, lbl
 
-def mse_loss(x, label, gps, eps=1e-6, margin=25):
+def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     gps = gps.cuda()
-    y = lbl*torch.pow((D - gps),2) #TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((D - gps / margin),2) #TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -257,7 +257,8 @@ def test(place_model, correlation_model, val_loader, epoch):
             output = torch.zeros(OUTPUT_DIM, ni).cuda()
             for imi in range(ni):
                 # compute output vector for image imi
-                output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
+                x = correlation_model(place_model(input[q][imi].cuda()).squeeze())
+                output[:, imi] = x / torch.norm(x) #correlation_model(place_model(input[q][imi].cuda()).squeeze())
             loss = mse_loss(output, target[q].cuda(), gps_info[q])
             score += loss
         
@@ -306,10 +307,11 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 output = torch.zeros(OUTPUT_DIM, ni).cuda()
                 for imi in range(ni):
                     # compute output vector for image imi
-                    output[:, imi] = correlation_model(place_model(input[q][imi].cuda()).squeeze())
+                    x = correlation_model(place_model(input[q][imi].cuda()).squeeze())
+                    output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
                 
-                if q == log_image:
-                    log_tuple(input[q], epoch + i, gps_info[q])
+                #if q == log_image:
+                #    log_tuple(input[q], epoch + i, gps_info[q])
 
                 gps_out = torch.tensor(gps_info[q])
                 loss = criterion(output, target[q].cuda(), gps_out)
