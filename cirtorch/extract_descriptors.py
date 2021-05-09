@@ -83,7 +83,9 @@ train_dataset = TuplesDataset(
         cities='debug',
         tuple_mining='default'
     )
-"""
+
+
+
 qidxs, pidxs = train_dataset.get_loaders()
 opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
@@ -108,11 +110,20 @@ np.savetxt('data/dataset/poolvecs.txt', poolvecs, delimiter=',')
 
 qvecs = qvecs.cpu().detach().numpy() 
 np.savetxt('data/dataset/qvecs.txt', qvecs, delimiter=',')
-"""
+
 np.savetxt('data/dataset/qpool.txt', train_dataset.qpool, delimiter=',')
-ppool = np.stack(train_dataset.ppool, axis=0)
-print(ppool)
+
+ppool = np.zeros((len(train_dataset.ppool), 100)) - 1
+for i, p in enumerate(train_dataset.ppool):
+    ppool[i, 0:np.shape(p)[0]] = p
+
 np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
 
-np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',')
-np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',')
+np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',', fmt="%s")
+np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',', fmt="%s")
+
+qcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.qImages])
+np.savetxt('data/dataset/qcoordinates.txt', qcoordinates, delimiter=',')
+
+dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.dbImages])
+np.savetxt('data/dataset/dbcoordinates.txt', dbcoordinates, delimiter=',')
