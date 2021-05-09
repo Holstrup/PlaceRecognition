@@ -119,15 +119,14 @@ def linear_regression(ground_truth, prediction, mode, epoch):
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color="blue", alpha=0.2)
-    plt.scatter(ground_truth, ground_truth /
-                posDistThr, color="green", alpha=0.2)
+    plt.scatter(ground_truth, ground_truth / 25, color="green", alpha=0.2)
 
     #x = np.linspace(0, 25, 25)
     #y = x
     #plt.plot(x, y, color = "green")
 
     model = linear_regression(ground_truth, prediction, mode, epoch)
-    x = np.linspace(0, 25, 25)
+    x = np.linspace(0, 1, 25)
     y = model.coef_ * x + model.intercept_
     plt.plot(x, y, color="red")
 
@@ -160,7 +159,7 @@ class CorrelationNet(torch.nn.Module):
         super(CorrelationNet, self).__init__()
         self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
         self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
-        #self.hidden12 = torch.nn.Dropout(p=0.2)
+        self.hidden12 = torch.nn.Dropout(p=0.1)
         self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         #self.hidden2o = torch.nn.Dropout(p=0.2)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
@@ -169,7 +168,7 @@ class CorrelationNet(torch.nn.Module):
         x = F.leaky_relu(self.input(x))
         x = F.leaky_relu(self.hidden1(x))
         x = F.leaky_relu(self.hidden2(x))
-        #x = self.hidden12(x)
+        x = self.hidden12(x)
         x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
@@ -303,13 +302,13 @@ def test(correlation_model, criterion, epoch):
         q_utm = qcoordinates[int(qpool[q])]
 
         for i, p in enumerate(positives):
-            pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            output[:, i + 1] = pred / (torch.norm(pred, p=2, dim=1, keepdim=True) + 1e-6)  # L2N
+            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            #output[:, i + 1] = pred / (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()  
             gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
-        loss.backward()
 
         # Only for first batch
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
@@ -319,7 +318,7 @@ def test(correlation_model, criterion, epoch):
             dist_gps.extend(dist.tolist())
 
     plot_points(np.array(dist_gps), np.array(dist_lat), 'Test', epoch)
-    tensorboard.add_scalar('Loss/validation', score, epoch)
+    tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
 
     """
     place_model.eval()
@@ -410,9 +409,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         q_utm = qcoordinates[int(qpool[q])]
 
         for i, p in enumerate(positives):
-            pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            output[:, i + 1] = pred / \
-                (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            #output[:, i + 1] = pred / \
+            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
             gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
