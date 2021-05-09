@@ -1,5 +1,5 @@
-import sys
-sys.path.insert(0, "/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch")
+#import sys
+#sys.path.insert(0, "/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch")
 
 import torch
 from torchvision import transforms
@@ -40,10 +40,10 @@ HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 1024
 OUTPUT_DIM = 2048
 
-LR = 0.005 #TODO: Lower Learning Rate
+LR = 0.001 #TODO: Lower Learning Rate
 WD = 4e-3
 
-dataset_path = '/Users/alexanderholstrup/Desktop/datasets/dataset'
+dataset_path = 'data/dataset'
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 imsize = 320
@@ -123,7 +123,7 @@ def plot_points(ground_truth, prediction, mode, epoch):
     model = linear_regression(ground_truth, prediction, mode, epoch)
     x = np.linspace(0, 25, 25)
     y = model.coef_ * x + model.intercept_
-    plt.plot(x, y, color = "blue")
+    plt.plot(x, y, color = "red")
 
     plt.xlabel('Ground Truth Distance [GPS]')
     plt.ylabel('Predicted Distance')
@@ -191,7 +191,7 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    gps = gps.cuda()
+    #gps = gps.cuda()
     y = lbl*torch.pow((D - gps / margin),2) #TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
@@ -295,7 +295,7 @@ def log_tuple(input, batchid, gps_info):
 # Train loop
 def train(correlation_model, criterion, optimizer, scheduler, epoch):
         qvecs = torch.from_numpy(np.loadtxt(f'{dataset_path}/qvecs.txt', delimiter=','))
-        poolvecs = torch.from_numpy(np.loadtxt(f'{dataset_path}/qvecs.txt', delimiter=','))
+        poolvecs = torch.from_numpy(np.loadtxt(f'{dataset_path}/poolvecs.txt', delimiter=','))
         
         qpool = torch.from_numpy(np.loadtxt(f'{dataset_path}/qpool.txt', delimiter=','))
         ppool = torch.from_numpy(np.loadtxt(f'{dataset_path}/ppool.txt', delimiter=','))
@@ -327,10 +327,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             q_utm = qcoordinates[int(qpool[q])]
 
             for i, p in enumerate(positives):
-                output[:,i + 1] = correlation_model(poolvecs[:, int(p)].float())
+                output[:,i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
                 gps_out[i] = distance(q_utm, pcoordinates[int(p)])
 
-            loss = criterion(output, target, gps_out.cuda())   
+            loss = criterion(output, target.cuda(), gps_out.cuda())   
             epoch_loss += loss
             loss.backward()
 
@@ -342,7 +342,8 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
                 dist_gps.extend(dist.tolist())
 
         plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
-
+        average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
+        tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch)
         """
         for i, (input, target, gps_info) in enumerate(train_loader):       
             nq = len(input) # number of training tuples
