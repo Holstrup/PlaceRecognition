@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, "/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch")
+
 import torch
 from torchvision import transforms
 from torch.autograd import Variable
@@ -40,6 +43,7 @@ OUTPUT_DIM = 2048
 LR = 0.005 #TODO: Lower Learning Rate
 WD = 4e-3
 
+dataset_path = '/Users/alexanderholstrup/Desktop/datasets/dataset'
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 imsize = 320
@@ -168,16 +172,16 @@ class CorrelationNet(torch.nn.Module):
 TRAINING
 """
 def distance(query, positive):
-    return np.linalg.norm(np.array(query)-np.array(positive))
+    return torch.norm(query-positive)
 
 def distances(x, label, gps, eps=1e-6):
     # x is D x N
     dim = x.size(0) # D
-    nq = torch.sum(label.data==-1) # number of tuples
+    nq = torch.sum(label==-1) # number of tuples
     S = x.size(1) // nq # number of images per tuple including query: 1+1+n
 
     x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
-    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    idx = [i for i in range(len(label)) if label[i] != -1]
     x2 = x[:, idx]
     lbl = label[label!=-1]
 
@@ -289,14 +293,57 @@ def log_tuple(input, batchid, gps_info):
 
 
 # Train loop
-def train(train_loader, place_model, correlation_model, criterion, optimizer, scheduler, epoch):
-        place_model.eval()
+def train(correlation_model, criterion, optimizer, scheduler, epoch):
+        qvecs = torch.from_numpy(np.loadtxt(f'{dataset_path}/qvecs.txt', delimiter=','))
+        poolvecs = torch.from_numpy(np.loadtxt(f'{dataset_path}/qvecs.txt', delimiter=','))
+        
+        qpool = torch.from_numpy(np.loadtxt(f'{dataset_path}/qpool.txt', delimiter=','))
+        ppool = torch.from_numpy(np.loadtxt(f'{dataset_path}/ppool.txt', delimiter=','))
+
+        qcoordinates = torch.from_numpy(np.loadtxt(f'{dataset_path}/qcoordinates.txt', delimiter=','))
+        pcoordinates = torch.from_numpy(np.loadtxt(f'{dataset_path}/dbcoordinates.txt', delimiter=','))
+        
+        #to cuda
+        qvecs = qvecs.cuda()
+        poolvecs = poolvecs.cuda()
+
+        #train mode
         correlation_model.train()
-        
-        #if (epoch % 5 == 0) and (epoch != 0): # Shuffle tuples every x epochs 
-        avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_model) 
-        
+
+
+        dist_lat = []
+        dist_gps = []
         epoch_loss = 0
+        for q in range(len(qpool)):
+            positives = ppool[q][ppool[q] != -1]
+
+            target = torch.ones(1+len(positives))
+            target[0] = -1
+
+            output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
+            gps_out = torch.ones(len(positives))
+            
+            output[:, 0] = correlation_model(qvecs[:, q].float())
+            q_utm = qcoordinates[int(qpool[q])]
+
+            for i, p in enumerate(positives):
+                output[:,i + 1] = correlation_model(poolvecs[:, int(p)].float())
+                gps_out[i] = distance(q_utm, pcoordinates[int(p)])
+
+            loss = criterion(output, target, gps_out.cuda())   
+            epoch_loss += loss
+            loss.backward()
+
+            # Only for first batch
+            if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+                dist, D, lbl = distances(output, target, gps_out)
+                D = D.cpu()
+                dist_lat.extend(D.tolist())
+                dist_gps.extend(dist.tolist())
+
+        plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
+
+        """
         for i, (input, target, gps_info) in enumerate(train_loader):       
             nq = len(input) # number of training tuples
             ni = len(input[0]) # number of images per tuple
@@ -331,7 +378,7 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
                 tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
                 plot_points(dist_gps, dist_lat, 'Training', epoch)
                 linear_regression(dist_gps, dist_lat, 'Training', epoch)
-    
+            """
         tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
         optimizer.step()
@@ -342,22 +389,22 @@ def train(train_loader, place_model, correlation_model, criterion, optimizer, sc
 def main():
     # Load Networks
     net = CorrelationNet()
-    model = load_placereg_net()
+    #model = load_placereg_net()
 
     # Move to GPU
     net = net.cuda()
-    model = model.cuda()
+    #model = model.cuda()
 
     # Get transformer for dataset
-    normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
-    resize = transforms.Resize((int(imsize * 3/4), imsize), interpolation=2)
+    #normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
+    #resize = transforms.Resize((int(imsize * 3/4), imsize), interpolation=2)
 
-    transform = transforms.Compose([
-        resize,
-        transforms.ToTensor(),
-        normalize,
-    ])
-
+    #transform = transforms.Compose([
+    #    resize,
+    #    transforms.ToTensor(),
+    #    normalize,
+    #])
+    """
     # Load Datasets
     train_dataset = TuplesDataset(
         name='mapillary',
@@ -402,27 +449,27 @@ def main():
             num_workers=workers, pin_memory=True,
             drop_last=True, collate_fn=collate_tuples
     )
-
+    """
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     criterion = mse_loss
     
-    avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
-    avg_neg_distance = val_loader.dataset.epoch_tuples_gps(model)
+    #avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
+    #avg_neg_distance = val_loader.dataset.epoch_tuples_gps(model)
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
         print(f'====> {epoch}/{EPOCH}')
-        #dump_data(train_loader, model, net, criterion, optimizer, scheduler, epoch)
-        train(train_loader, model, net, criterion, optimizer, scheduler, epoch)
+        train(net, criterion, optimizer, scheduler, epoch)
 
+        """
         if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
                 test(model, net, val_loader, epoch)
             
 
             torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
-
+        """
 if __name__ == '__main__':
     main()
