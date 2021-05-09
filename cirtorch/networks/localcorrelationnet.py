@@ -264,7 +264,7 @@ def dump_data(place_model, correlation_model, loader, epoch):
     # writer.writerows(images)
 
 
-def test(correlation_model, val_loader, epoch):
+def test(correlation_model, criterion, epoch):
     qvecs = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/test/qvecs.txt', delimiter=','))
     poolvecs = torch.from_numpy(np.loadtxt(
@@ -412,7 +412,7 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         for i, p in enumerate(positives):
             pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
             output[:, i + 1] = pred / \
-                (torch.norm(pred, p=2, dim=1, keepdim=True) + 1e-6)  # L2N
+                (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
             gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
@@ -555,7 +555,7 @@ def main():
         
         if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
-                test(model, net, val_loader, epoch)
+                test(net, criterion, epoch)
             
             #torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
         

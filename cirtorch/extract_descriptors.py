@@ -71,7 +71,7 @@ transform = transforms.Compose([
 
 train_dataset = TuplesDataset(
         name='mapillary',
-        mode='train',
+        mode='val',
         imsize=imsize,
         nnum=0,
         qsize=float('Inf'),
@@ -83,7 +83,7 @@ train_dataset = TuplesDataset(
         cities='debug',
         tuple_mining='default'
     )
-"""
+
 qidxs, pidxs = train_dataset.get_loaders()
 opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
@@ -104,15 +104,15 @@ for i, input in enumerate(qLoader):
     qvecs[:, i] = net(input.cuda()).data.squeeze()
 
 poolvecs = poolvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/poolvecs.txt', poolvecs, delimiter=',')
+np.savetxt('data/dataset/test/poolvecs.txt', poolvecs, delimiter=',')
 
 qvecs = qvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/qvecs.txt', qvecs, delimiter=',')
-"""
-np.savetxt('data/dataset/qpool.txt', train_dataset.qpool, delimiter=',')
+np.savetxt('data/dataset/test/qvecs.txt', qvecs, delimiter=',')
+
+np.savetxt('data/dataset/test/qpool.txt', train_dataset.qpool, delimiter=',')
 ppool = np.stack(train_dataset.ppool, axis=0)
 print(ppool)
-np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
+np.savetxt('data/dataset/test/ppool.txt', ppool, delimiter=',')
 
-np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',')
-np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',')
+np.savetxt('data/dataset/test/qImages.txt', train_dataset.qImages, delimiter=',')
+np.savetxt('data/dataset/test/dbImages.txt', train_dataset.dbImages, delimiter=',')
