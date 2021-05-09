@@ -11,7 +11,7 @@ from cirtorch.datasets.datahelpers import imresize, default_loader
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.genericdataset import ImagesFromList
 
-network_path = '/Users/alexanderholstrup/Desktop/plots/GEN_model_epoch220.pth.tar'
+network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 def load_placereg_net():
     # loading network from path
@@ -55,6 +55,8 @@ def load_placereg_net():
     return net
 
 net = load_placereg_net()
+net.cuda()
+net.eval()
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
 normalize = transforms.Normalize(mean=net.meta['mean'], std=net.meta['std'])
@@ -81,7 +83,7 @@ train_dataset = TuplesDataset(
         cities='debug',
         tuple_mining='default'
     )
-
+"""
 qidxs, pidxs = train_dataset.get_loaders()
 opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
@@ -106,9 +108,11 @@ np.savetxt('data/dataset/poolvecs.txt', poolvecs, delimiter=',')
 
 qvecs = qvecs.cpu().detach().numpy() 
 np.savetxt('data/dataset/qvecs.txt', qvecs, delimiter=',')
-
+"""
 np.savetxt('data/dataset/qpool.txt', train_dataset.qpool, delimiter=',')
-np.savetxt('data/dataset/ppool.txt', train_dataset.ppool, delimiter=',')
+ppool = np.stack(train_dataset.ppool, axis=0)
+print(ppool)
+np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
 
 np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',')
 np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',')
