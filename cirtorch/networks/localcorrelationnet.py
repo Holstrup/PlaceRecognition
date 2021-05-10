@@ -24,7 +24,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
-#from cirtorch.layers.normalization import L2N
+from cirtorch.utils.view_angle import field_of_view
 import cirtorch.layers.functional as LF
 torch.manual_seed(1)
 
@@ -48,6 +48,7 @@ network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_
 multiscale = '[1]'
 imsize = 320
 
+USE_IOU = True
 posDistThr = 25  # TODO: Try higher range
 negDistThr = 25
 workers = 8
@@ -179,8 +180,12 @@ class CorrelationNet(torch.nn.Module):
 TRAINING
 """
 
+def iou_distance(query, positive):
+    return field_of_view([query, positive])
 
-def distance(query, positive):
+def distance(query, positive, iou=USE_IOU):
+    if iou:
+        return iou_distance(query, positive)
     return torch.norm(query-positive)
 
 
