@@ -28,7 +28,7 @@ def calc_angles(ca, view_angle = VIEW_ANGLE):
     return (ca - view_angle / 2, ca + view_angle / 2)
 
 def calc_next_point(x, y, angle, view_distance=VIEW_DISTANCE):
-    return (x + view_distance * math.cos(angle), y + view_distance * math.sin(angle))
+    return [x + view_distance * math.cos(angle), y + view_distance * math.sin(angle)]
 
 def iou(polygon1, polygon2):
     intersection = polygon1.intersection(polygon2)
@@ -37,15 +37,15 @@ def iou(polygon1, polygon2):
 def ious(query_polygon, db_polygon):
     return [iou(query_polygon,polygon) for polygon in db_polygon]
 
-def field_of_view(points):
+def field_of_view(points, approximation=5):
     polygons = []
     for point in points:
-        angle1, angle2 = calc_angles(point[1])
-        points = [point[0]]
-        for i in range(11):
-            ang = angle1 + (VIEW_ANGLE / 10) * i
-            points.append(calc_next_point(point[0][0], point[0][1], ang))
-        points.append(point[0])
+        northing, easting, angle = point
+        starting_angle, _ = calc_angles(angle)
+        points = [point[0:2]]
+        for i in range(0, approximation + 1, 1):
+            ang = starting_angle + (VIEW_ANGLE / approximation) * i
+            points.append(calc_next_point(northing, easting, ang))
         polygons.append(Polygon(points))
     return polygons
     
@@ -71,7 +71,7 @@ def get_coordinate(key, postproc, raw):
     df = raw.loc[raw['key'] == key]
     ca = df['ca'].iloc[0]
     print(df['lat'].iloc[0], ',',df['lon'].iloc[0])
-    return [(easting, northing), to_radians(ca)]
+    return [easting, northing, to_radians(ca)]
 
 def get_coordinates(keys):
     points = [get_coordinate(keys[0], q_postproc, q_raw)]
@@ -79,7 +79,7 @@ def get_coordinates(keys):
         points.append(get_coordinate(key, db_postproc, db_raw))
     return points
 
-keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A','kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
+keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A'] #,'kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
 #keys = ['KsiCcR_YbcQnNAsKafSOng', 'tFmc-wK7A0eigPf9KhLHVQ', 'g7wfAspdwkiDfvknUdkZgg', 'pAG4DSoggEl5WVYUWjAEIA', 'l40wawAhi2TL-CZuzfrYig'] #1631
 #keys = ['MRfIz0MpoUP5LApkt5GwhA', 'TK6RLS3e8Oa7wqciYC75Ow', 'Tjsn1erZ7GdbeAJAZfDYDA', 'tqin7Zzu0dCGFZmrzhQCCw', 'BaaM4Qvf3VMvjiG1apeFWQ'] #3700
 #keys = ['DDb7lapO-czjhb6o_J1MxA', 'zFzarHuCvI73RJf_7MlkLQ', 'VrJfd57eglX5LskATygIiQ', 'XF9EaQsEE5V3WyO9sNu-6A', 'KiFXKBjFgBIOondz8Rm2Cg'] #3220
@@ -89,6 +89,7 @@ keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI
 
 
 points = get_coordinates(keys)
+print(points)
 pol = field_of_view(points)
 print(ious(pol[0], pol[1:]))
 plot_fov(pol)
