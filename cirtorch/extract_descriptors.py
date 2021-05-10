@@ -11,6 +11,9 @@ from cirtorch.datasets.datahelpers import imresize, default_loader
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.genericdataset import ImagesFromList
 
+dataset = 'train'
+root_path = f'data/dataset/{dataset}'
+posDistThr = 25
 network_path = 'data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar'
 multiscale = '[1]'
 def load_placereg_net():
@@ -71,14 +74,14 @@ transform = transforms.Compose([
 
 train_dataset = TuplesDataset(
         name='mapillary',
-        mode='train',
+        mode=dataset,
         imsize=imsize,
         nnum=0,
         qsize=float('Inf'),
         poolsize=float('Inf'),
         transform=transform,
-        posDistThr=25,
-        negDistThr=25, 
+        posDistThr=posDistThr,
+        negDistThr=posDistThr, 
         root_dir = 'data',
         cities='debug',
         tuple_mining='default'
@@ -104,23 +107,23 @@ for i, input in enumerate(qLoader):
     qvecs[:, i] = net(input.cuda()).data.squeeze()
 
 poolvecs = poolvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/poolvecs.txt', poolvecs, delimiter=',')
+np.savetxt(f'{root_path}/poolvecs.txt', poolvecs, delimiter=',')
 
 qvecs = qvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/qvecs.txt', qvecs, delimiter=',')
+np.savetxt(f'{root_path}/qvecs.txt', qvecs, delimiter=',')
 
-np.savetxt('data/dataset/qpool.txt', train_dataset.qpool, delimiter=',')
+np.savetxt(f'{root_path}/qpool.txt', train_dataset.qpool, delimiter=',')
 ppool = np.zeros((len(train_dataset.ppool), 100)) - 1
 for i, p in enumerate(train_dataset.ppool):
     ppool[i, 0:np.shape(p)[0]] = p
 
-np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
+np.savetxt(f'{root_path}/ppool.txt', ppool, delimiter=',')
 
-np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',', fmt="%s")
-np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',', fmt="%s")
+np.savetxt(f'{root_path}/qImages.txt', train_dataset.qImages, delimiter=',', fmt="%s")
+np.savetxt(f'{root_path}/dbImages.txt', train_dataset.dbImages, delimiter=',', fmt="%s")
 
 qcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]].extend(train_dataset.angleInfo[q[-26:-4]]) for q in train_dataset.qImages])
-np.savetxt('data/dataset/qcoordinates.txt', qcoordinates, delimiter=',')
+np.savetxt(f'{root_path}/qcoordinates.txt', qcoordinates, delimiter=',')
 
 dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]].extend(train_dataset.angleInfo[q[-26:-4]]) for q in train_dataset.dbImages])
-np.savetxt('data/dataset/dbcoordinates.txt', dbcoordinates, delimiter=',')
+np.savetxt(f'{root_path}/dbcoordinates.txt', dbcoordinates, delimiter=',')
