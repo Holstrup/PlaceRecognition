@@ -119,8 +119,8 @@ np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
 np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',', fmt="%s")
 np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',', fmt="%s")
 
-qcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.qImages])
+qcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]].extend(train_dataset.angleInfo[q[-26:-4]]) for q in train_dataset.qImages])
 np.savetxt('data/dataset/qcoordinates.txt', qcoordinates, delimiter=',')
 
-dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.dbImages])
+dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]].extend(train_dataset.angleInfo[q[-26:-4]]) for q in train_dataset.dbImages])
 np.savetxt('data/dataset/dbcoordinates.txt', dbcoordinates, delimiter=',')
