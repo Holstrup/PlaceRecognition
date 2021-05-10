@@ -409,10 +409,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         q_utm = qcoordinates[int(qpool[q])]
 
         for i, p in enumerate(positives):
-            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            #output[:, i + 1] = pred / \
-            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            #output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            output[:, i + 1] = pred / \
+                (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
             gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
@@ -540,8 +540,9 @@ def main():
     """
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(
-        optimizer, gamma=math.exp(-0.01))
+    #scheduler = torch.optim.lr_scheduler.ExponentialLR(
+    #    optimizer, gamma=math.exp(-0.01))
+    scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
     criterion = mse_loss
 
     #avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
