@@ -41,25 +41,24 @@ def field_of_view(points):
     polygons = []
     for point in points:
         angle1, angle2 = calc_angles(point[1])
-
-        point1 = calc_next_point(point[0][0], point[0][1], angle1)
-        point2 = calc_next_point(point[0][0], point[0][1], angle2)
-        points = [point[0], point1, point2]
+        points = [point[0]]
+        for i in range(11):
+            ang = angle1 + (VIEW_ANGLE / 10) * i
+            points.append(calc_next_point(point[0][0], point[0][1], ang))
+        points.append(point[0])
         polygons.append(Polygon(points))
     return polygons
     
 def plot_fov(polygon_list):
     Xq = np.array([list(i) for i in polygon_list[0].exterior.coords])
-    plt.scatter(Xq[:, 0], Xq[:, 1], facecolor=(0,1,0,0.5))
     plt.scatter(Xq[0, 0], Xq[0, 1], facecolor=(0,0,1,0.5))
-    t1 = plt.Polygon(Xq[:3,:], facecolor=(0,1,0,0.5))
+    t1 = plt.Polygon(Xq[:,:], facecolor=(0,1,0,0.5))
     plt.gca().add_patch(t1)
 
     for polygon in polygon_list[1:]:
         Xp = np.array([list(i) for i in polygon.exterior.coords])
-        plt.scatter(Xp[:, 0], Xp[:, 1], facecolor=(1,0,0,0.5))
         plt.scatter(Xp[0, 0], Xp[0, 1], facecolor=(0,0,1,0.5))
-        t1 = plt.Polygon(Xp[:3,:], facecolor=(1,0,0,0.3))
+        t1 = plt.Polygon(Xp[:,:], facecolor=(1,0,0,0.3))
         plt.gca().add_patch(t1)
 
     plt.xlim((min(Xq[:,0]) - 50, max(Xq[:,0]) + 50))
@@ -80,10 +79,14 @@ def get_coordinates(keys):
         points.append(get_coordinate(key, db_postproc, db_raw))
     return points
 
-#keys = ['0NvpSEDZd8Ll_N6YDaf8dA','EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A']#,'kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w']
+keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A','kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
 #keys = ['KsiCcR_YbcQnNAsKafSOng', 'tFmc-wK7A0eigPf9KhLHVQ', 'g7wfAspdwkiDfvknUdkZgg', 'pAG4DSoggEl5WVYUWjAEIA', 'l40wawAhi2TL-CZuzfrYig'] #1631
 #keys = ['MRfIz0MpoUP5LApkt5GwhA', 'TK6RLS3e8Oa7wqciYC75Ow', 'Tjsn1erZ7GdbeAJAZfDYDA', 'tqin7Zzu0dCGFZmrzhQCCw', 'BaaM4Qvf3VMvjiG1apeFWQ'] #3700
-keys = ['DDb7lapO-czjhb6o_J1MxA', 'zFzarHuCvI73RJf_7MlkLQ', 'VrJfd57eglX5LskATygIiQ', 'XF9EaQsEE5V3WyO9sNu-6A', 'KiFXKBjFgBIOondz8Rm2Cg'] #3220
+#keys = ['DDb7lapO-czjhb6o_J1MxA', 'zFzarHuCvI73RJf_7MlkLQ', 'VrJfd57eglX5LskATygIiQ', 'XF9EaQsEE5V3WyO9sNu-6A', 'KiFXKBjFgBIOondz8Rm2Cg'] #3220
+#keys = ['6jOFome0L5-qRaYGQW1doA', 'VrJfd57eglX5LskATygIiQ', 'KiFXKBjFgBIOondz8Rm2Cg', 'zFzarHuCvI73RJf_7MlkLQ', 'AchY4D1tRFwQLT2Bawoc0Q', 'XF9EaQsEE5V3WyO9sNu-6A']
+
+#keys = ['y2xotXR_HrbadIxXk24EkQ', 'u894ydL4oc7a4aLUwk9rwg', 'D6dYsU5W2JZfyMRdH-MZng', 'M06sx0JtP7X5MiPGzBh4yg', 'q9_ykmaKaJDYwKG0B_8CBg', 'E0tp9rcW0ooVyYoyobKvTg', 'f9ng8k9Ngt4UWja_a-mjaw', 'CxYjkOBcps80szVVKzfe5A']
+
 
 points = get_coordinates(keys)
 pol = field_of_view(points)
