@@ -71,7 +71,7 @@ transform = transforms.Compose([
 
 train_dataset = TuplesDataset(
         name='mapillary',
-        mode='val',
+        mode='train',
         imsize=imsize,
         nnum=0,
         qsize=float('Inf'),
@@ -104,15 +104,23 @@ for i, input in enumerate(qLoader):
     qvecs[:, i] = net(input.cuda()).data.squeeze()
 
 poolvecs = poolvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/test/poolvecs.txt', poolvecs, delimiter=',')
+np.savetxt('data/dataset/poolvecs.txt', poolvecs, delimiter=',')
 
 qvecs = qvecs.cpu().detach().numpy() 
-np.savetxt('data/dataset/test/qvecs.txt', qvecs, delimiter=',')
+np.savetxt('data/dataset/qvecs.txt', qvecs, delimiter=',')
 
-np.savetxt('data/dataset/test/qpool.txt', train_dataset.qpool, delimiter=',')
-ppool = np.stack(train_dataset.ppool, axis=0)
-print(ppool)
-np.savetxt('data/dataset/test/ppool.txt', ppool, delimiter=',')
+np.savetxt('data/dataset/qpool.txt', train_dataset.qpool, delimiter=',')
+ppool = np.zeros((len(train_dataset.ppool), 100)) - 1
+for i, p in enumerate(train_dataset.ppool):
+    ppool[i, 0:np.shape(p)[0]] = p
 
-np.savetxt('data/dataset/test/qImages.txt', train_dataset.qImages, delimiter=',')
-np.savetxt('data/dataset/test/dbImages.txt', train_dataset.dbImages, delimiter=',')
+np.savetxt('data/dataset/ppool.txt', ppool, delimiter=',')
+
+np.savetxt('data/dataset/qImages.txt', train_dataset.qImages, delimiter=',', fmt="%s")
+np.savetxt('data/dataset/dbImages.txt', train_dataset.dbImages, delimiter=',', fmt="%s")
+
+qcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.qImages])
+np.savetxt('data/dataset/qcoordinates.txt', qcoordinates, delimiter=',')
+
+dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]] for q in train_dataset.dbImages])
+np.savetxt('data/dataset/dbcoordinates.txt', dbcoordinates, delimiter=',')
