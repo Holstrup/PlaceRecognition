@@ -120,7 +120,7 @@ def linear_regression(ground_truth, prediction, mode, epoch):
 def plot_points(ground_truth, prediction, mode, epoch):
     plt.clf()
     plt.scatter(ground_truth, prediction, color="blue", alpha=0.2)
-    plt.scatter(ground_truth, ground_truth / 25, color="green", alpha=0.2)
+    plt.scatter(ground_truth, ground_truth, color="green", alpha=0.2)
 
     #x = np.linspace(0, 25, 25)
     #y = x
@@ -186,7 +186,7 @@ def iou_distance(query, positive):
 def distance(query, positive, iou=USE_IOU):
     if iou:
         return iou_distance(query, positive)
-    return torch.norm(query-positive)
+    return torch.norm(query[0:2]-positive[0:2])
 
 
 def distances(x, label, gps, eps=1e-6):
@@ -270,19 +270,19 @@ def dump_data(place_model, correlation_model, loader, epoch):
 
 def test(correlation_model, criterion, epoch):
     qvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/qvecs.txt', delimiter=','))
+        f'{dataset_path}/val/qvecs.txt', delimiter=','))
     poolvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/poolvecs.txt', delimiter=','))
+        f'{dataset_path}/val/poolvecs.txt', delimiter=','))
 
     qpool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/qpool.txt', delimiter=','))
+        f'{dataset_path}/val/qpool.txt', delimiter=','))
     ppool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/ppool.txt', delimiter=','))
+        f'{dataset_path}/val/ppool.txt', delimiter=','))
 
     qcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/qcoordinates.txt', delimiter=','))
+        f'{dataset_path}/val/qcoordinates.txt', delimiter=','))
     pcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/test/dbcoordinates.txt', delimiter=','))
+        f'{dataset_path}/val/dbcoordinates.txt', delimiter=','))
 
     # to cuda
     qvecs = qvecs.cuda()
@@ -308,19 +308,20 @@ def test(correlation_model, criterion, epoch):
 
         for i, p in enumerate(positives):
             #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            #output[:, i + 1] = pred / (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
-            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()  
-            gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
+            #output[:, i + 1] = pred / \
+            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            gps_out[i] = distance(q_utm, pcoordinates[int(p)])
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
 
         # Only for first batch
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            dist, D, lbl = distances(output, target, gps_out)
+            _, D, _ = distances(output, target, gps_out)
             D = D.cpu()
             dist_lat.extend(D.tolist())
-            dist_gps.extend(dist.tolist())
+            dist_gps.extend(gps_out.tolist())
 
     plot_points(np.array(dist_gps), np.array(dist_lat), 'Test', epoch)
     tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
@@ -377,19 +378,19 @@ def log_tuple(input, batchid, gps_info):
 # Train loop
 def train(correlation_model, criterion, optimizer, scheduler, epoch):
     qvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/qvecs.txt', delimiter=','))
+        f'{dataset_path}/train/qvecs.txt', delimiter=','))
     poolvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/poolvecs.txt', delimiter=','))
+        f'{dataset_path}/train/poolvecs.txt', delimiter=','))
 
     qpool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/qpool.txt', delimiter=','))
+        f'{dataset_path}/train/qpool.txt', delimiter=','))
     ppool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/ppool.txt', delimiter=','))
+        f'{dataset_path}/train/ppool.txt', delimiter=','))
 
     qcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/qcoordinates.txt', delimiter=','))
+        f'{dataset_path}/train/qcoordinates.txt', delimiter=','))
     pcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/dbcoordinates.txt', delimiter=','))
+        f'{dataset_path}/train/dbcoordinates.txt', delimiter=','))
 
     # to cuda
     qvecs = qvecs.cuda()
@@ -415,9 +416,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
 
         for i, p in enumerate(positives):
             #output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            output[:, i + 1] = pred / \
-                (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            #output[:, i + 1] = pred / \
+            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
+            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
             gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
@@ -426,10 +428,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
 
         # Only for first batch
         if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            dist, D, lbl = distances(output, target, gps_out)
+            _, D, _ = distances(output, target, gps_out)
             D = D.cpu()
             dist_lat.extend(D.tolist())
-            dist_gps.extend(dist.tolist())
+            dist_gps.extend(gps_out.tolist())
 
     plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
     average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
