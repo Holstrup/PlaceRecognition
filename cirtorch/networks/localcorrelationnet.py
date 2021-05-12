@@ -24,7 +24,7 @@ from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
-from cirtorch.utils.view_angle import field_of_view
+from cirtorch.utils.view_angle import field_of_view, ious
 import cirtorch.layers.functional as LF
 torch.manual_seed(1)
 
@@ -40,7 +40,7 @@ HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 1024
 OUTPUT_DIM = 2048
 
-LR = 0.001  # TODO: Lower Learning Rate
+LR = 0.0005  # TODO: Lower Learning Rate
 WD = 4e-3
 
 dataset_path = 'data/dataset'
@@ -159,18 +159,18 @@ class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
         self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
-        self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
-        self.hidden12 = torch.nn.Dropout(p=0.1)
-        self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
+        #self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
+        #self.hidden12 = torch.nn.Dropout(p=0.1)
+        #self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         #self.hidden2o = torch.nn.Dropout(p=0.2)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
-        x = F.leaky_relu(self.hidden1(x))
-        x = F.leaky_relu(self.hidden2(x))
-        x = self.hidden12(x)
-        x = F.leaky_relu(self.hidden2(x))
+        #x = F.leaky_relu(self.hidden1(x))
+        #x = F.leaky_relu(self.hidden2(x))
+        #x = self.hidden12(x)
+        #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
         return x
@@ -181,11 +181,12 @@ TRAINING
 """
 
 def iou_distance(query, positive):
-    return field_of_view([query, positive])
+    pol = field_of_view([query, positive])
+    return ious(pol[0], pol[1:])
 
 def distance(query, positive, iou=USE_IOU):
     if iou:
-        return iou_distance(query, positive)
+        return iou_distance(query, positive)[0]
     return torch.norm(query[0:2]-positive[0:2])
 
 
@@ -210,7 +211,7 @@ def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     #gps = gps.cuda()
     # TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
-    y = lbl*torch.pow((D - gps / margin), 2)
+    y = lbl*torch.pow((D - gps), 2)
     y = torch.sum(y)
     return y
 
@@ -420,7 +421,7 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             #output[:, i + 1] = pred / \
             #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
             output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            gps_out[i] = distance(q_utm, pcoordinates[int(p)]) / posDistThr
+            gps_out[i] = distance(q_utm, pcoordinates[int(p)])  #/ posDistThr
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
@@ -547,9 +548,8 @@ def main():
     """
     # Optimizer, scheduler and criterion
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-    #scheduler = torch.optim.lr_scheduler.ExponentialLR(
-    #    optimizer, gamma=math.exp(-0.01))
-    scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
+    #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
     criterion = mse_loss
 
     #avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
