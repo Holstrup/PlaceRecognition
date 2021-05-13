@@ -14,6 +14,7 @@ import random
 from cirtorch.datasets.datahelpers import default_loader, imresize, cid2filename
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.general import get_data_root
+from cirtorch.utils.view_angle import field_of_view, ious
 
 default_cities = {
     'train': ["zurich", "london", "boston", "melbourne", "amsterdam","helsinki",
@@ -448,10 +449,10 @@ class TuplesDataset(data.Dataset):
         distances = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
-        distances.append(self.distance(getGpsAndAngle(qid), getGpsAndAngle(pid)))
+        distances.append(self.ioudistance(getGpsAndAngle(qid), getGpsAndAngle(pid)))
         for i in range(len(self.nidxs[index])):
             nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
-            distances.append(self.distance(getGpsAndAngle(qid), getGpsAndAngle(nid)))
+            distances.append(self.ioudistance(getGpsAndAngle(qid), getGpsAndAngle(nid)))
         return distances
     
     def getGpsInformation(self, index, pos_index):
@@ -487,6 +488,10 @@ class TuplesDataset(data.Dataset):
 
     def distance(self, query, positive):
         return torch.norm(torch.tensor(query) - torch.tensor(positive), dim=-1)
+
+    def ioudistance(self, query, positive):
+        pol = field_of_view([query, positive])
+        return ious(pol[0], pol[1:])[0]
 
     def create_epoch_tuples(self, net):
         
