@@ -436,9 +436,24 @@ class TuplesDataset(data.Dataset):
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
         target = torch.Tensor([-1, 1] + [0]*len(self.nidxs[index]))
-        distances = self.getGpsInformation(index, pos_index)
+        
+        #distances = self.getGpsInformation(index, pos_index) # GPS Distance
+        distances = self.getIouInformation(index, pos_index)  # IoU Distance
         return (output, target, distances)
 
+    def getGpsAndAngle(self, idx):
+        return self.gpsInfo.get(idx) + self.angleInfo.get(idx)
+
+    def getIouInformation(self, index, pos_index):
+        distances = []
+        qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
+        pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
+        distances.append(self.distance(getGpsAndAngle(qid), getGpsAndAngle(pid)))
+        for i in range(len(self.nidxs[index])):
+            nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
+            distances.append(self.distance(getGpsAndAngle(qid), getGpsAndAngle(nid)))
+        return distances
+    
     def getGpsInformation(self, index, pos_index):
         distances = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
