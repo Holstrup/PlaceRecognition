@@ -39,7 +39,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss', 'ContrastiveWeightedLossVariant', "WeightedGeneralizedContrastiveLoss", "WeightedGeneralizedMSELoss"]
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss', 'ContrastiveWeightedLossVariant', "WeightedGeneralizedContrastiveLoss", "WeightedGeneralizedMSELoss", "IoUWeightedGeneralizedMSELoss"]
 optimizer_names = ['sgd', 'adam']
 
 
