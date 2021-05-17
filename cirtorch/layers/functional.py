@@ -544,9 +544,8 @@ def iou_generalized_contrastive_loss(x, label, ious, margin=0.7, eps=1e-6):
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
 
     y = 0.5*ious*torch.pow(D,2) + 0.5*(1-ious)*torch.pow(torch.clamp(margin-D, min=0),2)
-
     y = torch.sum(y)
-    smoothing_factor = torch.sum(ious)
+    smoothing_factor = torch.sum(ious[1:])
     return y, smoothing_factor
 
 def generalized_contrastive_mse_loss(x, label, gps, margin=25, eps=1e-6, alpha=35): 

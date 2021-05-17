@@ -46,10 +46,10 @@ group.add_argument('--network-offtheshelf', '-noff', metavar='NETWORK',
                         " examples: 'resnet101-gem' | 'resnet101-gem-reg' | 'resnet101-gem-whiten' | 'resnet101-gem-lwhiten' | 'resnet101-gem-reg-whiten'")
 
 # test options
-parser.add_argument('--datasets', '-d', metavar='DATASETS', default='oxford5k,paris6k',
+parser.add_argument('--datasets', '-d', metavar='DATASETS', default='mapillary',
                     help="comma separated list of test datasets: " + 
                         " | ".join(datasets_names) + 
-                        " (default: 'oxford5k,paris6k')")
+                        " (default: 'mapillary')")
 parser.add_argument('--image-size', default=1024, type=int, metavar='N',
                     help='maximum size of longer image side used for training (default: 1024)')
 parser.add_argument('--multiscale', '-ms', metavar='MULTISCALE', default='[1]', 

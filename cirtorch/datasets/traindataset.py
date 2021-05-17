@@ -449,10 +449,10 @@ class TuplesDataset(data.Dataset):
         distances = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
         pid = self.dbImages[self.pidxs[index]][pos_index].split('/')[-1][:-4]
-        distances.append(self.ioudistance(getGpsAndAngle(qid), getGpsAndAngle(pid)))
+        distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid)))
         for i in range(len(self.nidxs[index])):
             nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
-            distances.append(self.ioudistance(getGpsAndAngle(qid), getGpsAndAngle(nid)))
+            distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(nid)))
         return distances
     
     def getGpsInformation(self, index, pos_index):
@@ -657,7 +657,7 @@ class TuplesDataset(data.Dataset):
                     #TODO: This will choose the same negatives every time (assuming the samples are the same)
                     # Is this dangerous? Do we risk overtraining on a few samples, because we choose them very often?
                     if (len(nidxs) < self.nnum // 2):
-                        potential = int(idxs2images[indicies[q, r]]) 
+                        potential = int(idxs2images[indicies[q, r]])
                     else:
                         r = random.randint(len(nidxs), len(idxs2images)-1)
                         potential = int(idxs2images[indicies[q, r]])
