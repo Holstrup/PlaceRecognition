@@ -49,6 +49,8 @@ multiscale = '[1]'
 imsize = 320
 
 USE_IOU = True
+PLOT_FREQ = 20
+TEST_FREQ = 10
 posDistThr = 25  # TODO: Try higher range
 negDistThr = 25
 workers = 8
@@ -62,6 +64,28 @@ tensorboard = SummaryWriter(
 """
 Dataset
 """
+
+qvecs = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/qvecs.txt', delimiter=','))
+poolvecs = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/poolvecs.txt', delimiter=','))
+
+qpool = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/qpool.txt', delimiter=','))
+ppool = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/ppool.txt', delimiter=','))
+
+qcoordinates = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/qcoordinates.txt', delimiter=','))
+pcoordinates = torch.from_numpy(np.loadtxt(
+        f'{dataset_path}/train/dbcoordinates.txt', delimiter=','))
+    
+qimages = pd.read_csv(f'{dataset_path}/train/qImages.txt', delimiter=',', header=None)
+dbimages = pd.read_csv(f'{dataset_path}/train/dbImages.txt', delimiter=',', header=None)
+
+# to cuda
+qvecs = qvecs.cuda()
+poolvecs = poolvecs.cuda()
 
 
 def load_placereg_net():
@@ -270,24 +294,24 @@ def dump_data(place_model, correlation_model, loader, epoch):
 
 
 def test(correlation_model, criterion, epoch):
-    qvecs = torch.from_numpy(np.loadtxt(
+    qvecs_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/qvecs.txt', delimiter=','))
-    poolvecs = torch.from_numpy(np.loadtxt(
+    poolvecs_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/poolvecs.txt', delimiter=','))
 
-    qpool = torch.from_numpy(np.loadtxt(
+    qpool_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/qpool.txt', delimiter=','))
-    ppool = torch.from_numpy(np.loadtxt(
+    ppool_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/ppool.txt', delimiter=','))
 
-    qcoordinates = torch.from_numpy(np.loadtxt(
+    qcoordinates_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/qcoordinates.txt', delimiter=','))
-    pcoordinates = torch.from_numpy(np.loadtxt(
+    pcoordinates_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/dbcoordinates.txt', delimiter=','))
 
     # to cuda
-    qvecs = qvecs.cuda()
-    poolvecs = poolvecs.cuda()
+    qvecs_test = qvecs_test.cuda()
+    poolvecs_test = poolvecs_test.cuda()
 
     # eval mode
     correlation_model.eval()
@@ -295,9 +319,9 @@ def test(correlation_model, criterion, epoch):
     dist_lat = []
     dist_gps = []
     epoch_loss = 0
-    for i in range(len(qpool)):
-        q = int(qpool[i])
-        positives = ppool[i][ppool[i] != -1]
+    for i in range(len(qpool_test)):
+        q = int(qpool_test[i])
+        positives = ppool_test[i][ppool_test[i] != -1]
 
         target = torch.ones(1+len(positives))
         target[0] = -1
@@ -305,63 +329,23 @@ def test(correlation_model, criterion, epoch):
         output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
         gps_out = torch.ones(len(positives))
 
-        output[:, 0] = correlation_model(qvecs[:, i].float())
-        q_utm = qcoordinates[q]
+        output[:, 0] = correlation_model(qvecs_test[:, i].float())
+        q_utm = qcoordinates_test[q]
 
         for i, p in enumerate(positives):
-            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            #output[:, i + 1] = pred / \
-            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
-            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            gps_out[i] = distance(q_utm, pcoordinates[int(p)])
+            output[:, i + 1] = correlation_model(poolvecs_test[:, int(p)].float()).cuda()
+            gps_out[i] = distance(q_utm, pcoordinates_test[int(p)])
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
 
-        # Only for first batch
-        if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            _, D, _ = distances(output, target, gps_out)
-            D = D.cpu()
-            dist_lat.extend(D.tolist())
-            dist_gps.extend(gps_out.tolist())
+        _, D, _ = distances(output, target, gps_out)
+        D = D.cpu()
+        dist_lat.extend(D.tolist())
+        dist_gps.extend(gps_out.tolist())
 
     plot_points(np.array(dist_gps), np.array(dist_lat), 'Test', epoch)
     tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
-
-    """
-    place_model.eval()
-    correlation_model.eval()
-    score = 0
-    for i, (input, target, gps_info) in enumerate(val_loader):     
-        nq = len(input) # number of training tuples
-        ni = len(input[0]) # number of images per tuple
-        gps_info = torch.tensor(gps_info)
-        dist_lat = np.zeros(nq)
-        dist_gps = np.zeros(nq)
-
-        for q in range(nq):
-            output = torch.zeros(OUTPUT_DIM, ni).cuda()
-            for imi in range(ni):
-                # compute output vector for image imi
-                x = correlation_model(place_model(input[q][imi].cuda()).squeeze())
-                output[:, imi] = x / torch.norm(x) #correlation_model(place_model(input[q][imi].cuda()).squeeze())
-            loss = mse_loss(output, target[q].cuda(), gps_info[q])
-            score += loss
-        
-            # Only for first batch
-            if i == 0:
-                dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-                D = D.cpu()
-                dist_lat[q] = D[0]
-                dist_gps[q] = dist[0]
-        
-        if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-            plot_points(dist_gps, dist_lat, 'Validation', epoch)
-            linear_regression(dist_gps, dist_lat, 'Training', epoch)
-        
-        del output
-    tensorboard.add_scalar('Loss/validation', score, epoch)
-    """
 
 
 def log_tuple(input, batchid, gps_info):
@@ -379,30 +363,10 @@ def log_tuple(input, batchid, gps_info):
 
 # Train loop
 def train(correlation_model, criterion, optimizer, scheduler, epoch):
-    qvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/qvecs.txt', delimiter=','))
-    poolvecs = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/poolvecs.txt', delimiter=','))
-
-    qpool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/qpool.txt', delimiter=','))
-    ppool = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/ppool.txt', delimiter=','))
-
-    qcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/qcoordinates.txt', delimiter=','))
-    pcoordinates = torch.from_numpy(np.loadtxt(
-        f'{dataset_path}/train/dbcoordinates.txt', delimiter=','))
-    
-    qimages = pd.read_csv(f'{dataset_path}/train/qImages.txt', delimiter=',', header=None)
-    dbimages = pd.read_csv(f'{dataset_path}/train/dbImages.txt', delimiter=',', header=None)
-
-    # to cuda
-    qvecs = qvecs.cuda()
-    poolvecs = poolvecs.cuda()
-
     # train mode
     correlation_model.train()
+
+    RANDOM_TUPLE = random.randint(0, len(qpool)-1)
 
     dist_lat = []
     dist_gps = []
@@ -420,7 +384,6 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         q_utm = qcoordinates[q]
         #print('>', qimages.iloc[[int(qpool[q])]].values[0][0])
         for j, p in enumerate(positives):
-            #output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
             #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
             #output[:, i + 1] = pred / \
             #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
@@ -432,8 +395,15 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         epoch_loss += loss
         loss.backward()
 
+        if i == RANDOM_TUPLE:
+            _, D, _ = distances(output, target, gps_out)
+            pred = D.cpu()
+            pred = pred.tolist()
+            gt = gps_out.tolist()
+            plot_points(np.array(gt), np.array(pred), 'Training_Tuple', epoch)
+
         # Only for first batch
-        if (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
+        if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))):
             _, D, _ = distances(output, target, gps_out)
             D = D.cpu()
             dist_lat.extend(D.tolist())
@@ -443,42 +413,7 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
     tensorboard.add_scalar('Distances/AvgErrorDistance',
                            np.mean(average_dist), epoch)
-    """
-        for i, (input, target, gps_info) in enumerate(train_loader):       
-            nq = len(input) # number of training tuples
-            ni = len(input[0]) # number of images per tuple
-            dist_lat = np.zeros(nq)
-            dist_gps = np.zeros(nq)
-            log_image = random.randint(0,nq - 1)
-            for q in range(nq):
-                output = torch.zeros(OUTPUT_DIM, ni).cuda()
-                for imi in range(ni):
-                    # compute output vector for image imi
-                    x = correlation_model(place_model(input[q][imi].cuda()).squeeze())
-                    output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
-                
-                #if q == log_image:
-                #    log_tuple(input[q], epoch + i, gps_info[q])
 
-                gps_out = torch.tensor(gps_info[q])
-                loss = criterion(output, target[q].cuda(), gps_out)
-                epoch_loss += loss
-                loss.backward()    
-
-                # Only for first batch
-                if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-                    dist, D, lbl = distances(output, target[q].cuda(), gps_info[q])
-                    D = D.cpu()
-                    dist_lat[q] = D[0]
-                    dist_gps[q] = dist[0]
-            #if epoch % (EPOCH // 10) == 0:
-            #    dump_data(place_model, correlation_model, train_loader, epoch)
-            if i == 0 and (epoch % (EPOCH // 100) == 0 or (epoch == (EPOCH-1))):
-                average_dist = np.absolute(dist_gps - dist_lat)
-                tensorboard.add_scalar('Distances/AvgErrorDistance', np.mean(average_dist), epoch) 
-                plot_points(dist_gps, dist_lat, 'Training', epoch)
-                linear_regression(dist_gps, dist_lat, 'Training', epoch)
-            """
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
     optimizer.step()
@@ -505,60 +440,13 @@ def main():
     #    transforms.ToTensor(),
     #    normalize,
     # ])
-    """
-    # Load Datasets
-    train_dataset = TuplesDataset(
-        name='mapillary',
-        mode='train',
-        imsize=imsize,
-        nnum=0,
-        qsize=query_size,
-        poolsize=pool_size,
-        transform=transform,
-        posDistThr=posDistThr,
-        negDistThr=negDistThr, 
-        root_dir = 'data',
-        cities='debug', 
-        tuple_mining='gps'
-    )
-
-    val_dataset = TuplesDataset(
-            name='mapillary',
-            mode='val',
-            imsize=imsize,
-            nnum=0,
-            qsize=float('Inf'),
-            poolsize=float('Inf'),
-            transform=transform,
-            posDistThr=posDistThr, # Use 25 meters for both pos and neg
-            negDistThr=negDistThr,
-            root_dir = 'data',
-            cities='debug',
-            tuple_mining='gps'
-    )
-
-    # Dataloaders
-    train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True,
-            num_workers=workers, pin_memory=True, sampler=None,
-            drop_last=True, collate_fn=collate_tuples
-    )
-
-
-    val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=(BATCH_SIZE - 100), shuffle=False,
-            num_workers=workers, pin_memory=True,
-            drop_last=True, collate_fn=collate_tuples
-    )
-    """
     # Optimizer, scheduler and criterion
+
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
     criterion = mse_loss
 
-    #avg_neg_distance = train_loader.dataset.epoch_tuples_gps(model)
-    #avg_neg_distance = val_loader.dataset.epoch_tuples_gps(model)
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
@@ -566,7 +454,7 @@ def main():
         train(net, criterion, optimizer, scheduler, epoch)
 
         
-        if (epoch % (EPOCH // 10) == 0 or (epoch == (EPOCH-1))):
+        if (epoch % TEST_FREQ == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
                 test(net, criterion, epoch)
             
