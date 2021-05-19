@@ -186,7 +186,7 @@ def iou_distance(query, positive):
 
 def distance(query, positive, iou=USE_IOU):
     if iou:
-        return iou_distance(query, positive)[0]
+        return 1.0 - iou_distance(query, positive)[0]
     return torch.norm(query[0:2]-positive[0:2])
 
 
@@ -295,8 +295,9 @@ def test(correlation_model, criterion, epoch):
     dist_lat = []
     dist_gps = []
     epoch_loss = 0
-    for q in range(len(qpool)):
-        positives = ppool[q][ppool[q] != -1]
+    for i in range(len(qpool)):
+        q = int(qpool[i])
+        positives = ppool[i][ppool[i] != -1]
 
         target = torch.ones(1+len(positives))
         target[0] = -1
@@ -304,8 +305,8 @@ def test(correlation_model, criterion, epoch):
         output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
         gps_out = torch.ones(len(positives))
 
-        output[:, 0] = correlation_model(qvecs[:, q].float())
-        q_utm = qcoordinates[int(qpool[q])]
+        output[:, 0] = correlation_model(qvecs[:, i].float())
+        q_utm = qcoordinates[q]
 
         for i, p in enumerate(positives):
             #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
@@ -392,6 +393,9 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         f'{dataset_path}/train/qcoordinates.txt', delimiter=','))
     pcoordinates = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/train/dbcoordinates.txt', delimiter=','))
+    
+    qimages = pd.read_csv(f'{dataset_path}/train/qImages.txt', delimiter=',', header=None)
+    dbimages = pd.read_csv(f'{dataset_path}/train/dbImages.txt', delimiter=',', header=None)
 
     # to cuda
     qvecs = qvecs.cuda()
@@ -403,26 +407,27 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     dist_lat = []
     dist_gps = []
     epoch_loss = 0
-    for q in range(len(qpool)):
-        positives = ppool[q][ppool[q] != -1]
-
+    for i in range(len(qpool)):
+        q = int(qpool[i])
+        positives = ppool[i][ppool[i] != -1]
         target = torch.ones(1+len(positives))
         target[0] = -1
 
         output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
         gps_out = torch.ones(len(positives))
-
-        output[:, 0] = correlation_model(qvecs[:, q].float())
-        q_utm = qcoordinates[int(qpool[q])]
-
-        for i, p in enumerate(positives):
+        
+        output[:, 0] = correlation_model(qvecs[:, i].float())
+        q_utm = qcoordinates[q]
+        #print('>', qimages.iloc[[int(qpool[q])]].values[0][0])
+        for j, p in enumerate(positives):
             #output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
             #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
             #output[:, i + 1] = pred / \
             #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
-            output[:, i + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            gps_out[i] = distance(q_utm, pcoordinates[int(p)])  #/ posDistThr
-
+            output[:, j + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
+            gps_out[j] = distance(q_utm, pcoordinates[int(p)])  #/ posDistThr
+            #print('>>', dbimages.iloc[[int(p)]].values[0][0], gps_out[i])
+        #print(gps_out[j])
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
         loss.backward()
