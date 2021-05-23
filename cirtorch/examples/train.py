@@ -548,7 +548,10 @@ def validate(val_loader, model, criterion, epoch):
         #TODO: Fix loss func to be able to take a batch - For now using contrastive loss
         gps_info = torch.tensor(gps_info)
         gps_out = torch.flatten(gps_info)
-        loss = criterion(output, torch.cat(target).cuda(), gps_out.cuda())
+        if 'Weighted' in args.loss:
+            loss = criterion(output, target[q].cuda(), gps_info[q].cuda())
+        else:
+            loss = criterion(output, target[q].cuda())
 
         # record loss
         losses.update(loss.item()/nq, nq)

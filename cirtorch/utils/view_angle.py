@@ -17,7 +17,7 @@ db_raw = pd.read_csv(f'/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnim
 VIEW_DISTANCE = 50   #Meters 
 
 # view_angle: what is our field of view?
-VIEW_ANGLE = math.pi / 2
+VIEW_ANGLE = math.pi / 2 #math.pi / 4 + math.pi / 8 #+ math.pi / 16 #math.pi / 2
 
 
 def to_radians(angle):
@@ -37,10 +37,12 @@ def iou(polygon1, polygon2):
 def ious(query_polygon, db_polygon):
     return [iou(query_polygon,polygon) for polygon in db_polygon]
 
-def field_of_view(points, approximation=10):
+def field_of_view(points, approximation=10, convert_to_radians=True):
     polygons = []
     for point in points:
         northing, easting, angle = point
+        if convert_to_radians:
+            angle = to_radians(angle)
         starting_angle, end_angle = calc_angles(angle)
         points = [[northing, easting]]
 
@@ -79,7 +81,7 @@ def get_coordinates(keys):
         points.append(get_coordinate(key, db_postproc, db_raw))
     return points
 
-keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A','kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
+#keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A','kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
 #keys = ['KsiCcR_YbcQnNAsKafSOng', 'tFmc-wK7A0eigPf9KhLHVQ', 'g7wfAspdwkiDfvknUdkZgg', 'pAG4DSoggEl5WVYUWjAEIA', 'l40wawAhi2TL-CZuzfrYig'] #1631
 #keys = ['MRfIz0MpoUP5LApkt5GwhA', 'TK6RLS3e8Oa7wqciYC75Ow', 'Tjsn1erZ7GdbeAJAZfDYDA', 'tqin7Zzu0dCGFZmrzhQCCw', 'BaaM4Qvf3VMvjiG1apeFWQ'] #3700
 #keys = ['DDb7lapO-czjhb6o_J1MxA', 'zFzarHuCvI73RJf_7MlkLQ', 'VrJfd57eglX5LskATygIiQ', 'XF9EaQsEE5V3WyO9sNu-6A', 'KiFXKBjFgBIOondz8Rm2Cg'] #3220
@@ -88,7 +90,7 @@ keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI
 #keys = ['y2xotXR_HrbadIxXk24EkQ', 'u894ydL4oc7a4aLUwk9rwg', 'D6dYsU5W2JZfyMRdH-MZng', 'M06sx0JtP7X5MiPGzBh4yg', 'q9_ykmaKaJDYwKG0B_8CBg', 'E0tp9rcW0ooVyYoyobKvTg', 'f9ng8k9Ngt4UWja_a-mjaw', 'CxYjkOBcps80szVVKzfe5A']
 
 
-points = get_coordinates(keys)
-pol = field_of_view(points)
-print(ious(pol[0], pol[1:]))
-plot_fov(pol)
+#points = get_coordinates(keys)
+#pol = field_of_view(points)
+#print(ious(pol[0], pol[1:]))
+#plot_fov(pol)
