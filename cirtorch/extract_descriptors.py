@@ -86,7 +86,6 @@ train_dataset = TuplesDataset(
         cities='debug',
         tuple_mining='default'
     )
-
 qidxs, pidxs = train_dataset.get_loaders()
 opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
@@ -99,12 +98,20 @@ for i, input in enumerate(dbLoader):
     poolvecs[:, i] = net(input.cuda()).data.squeeze()
 
 qLoader = torch.utils.data.DataLoader(
-            ImagesFromList(root='', images=[train_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
+            ImagesFromList(root='', images=[train_dataset.qImages[i] for i in train_dataset.qpool], imsize=imsize, transform=transform),
                 **opt)
 
 qvecs = torch.zeros(net.meta['outputdim'], len(qidxs)).cuda()
 for i, input in enumerate(qLoader):
     qvecs[:, i] = net(input.cuda()).data.squeeze()
+
+i = 120
+q = train_dataset.qpool[i]
+positives = train_dataset.ppool[i]
+for pos in positives:
+    print(q, pos, torch.pow((qvecs[:, q] - poolvecs[:, pos])+1e-6, 2).sum(dim=0).sqrt())
+
+"""
 
 poolvecs = poolvecs.cpu().detach().numpy() 
 np.savetxt(f'{root_path}/poolvecs.txt', poolvecs, delimiter=',')
@@ -127,3 +134,4 @@ np.savetxt(f'{root_path}/qcoordinates.txt', qcoordinates, delimiter=',')
 
 dbcoordinates = np.array([train_dataset.gpsInfo[q[-26:-4]].extend(train_dataset.angleInfo[q[-26:-4]]) for q in train_dataset.dbImages])
 np.savetxt(f'{root_path}/dbcoordinates.txt', dbcoordinates, delimiter=',')
+"""

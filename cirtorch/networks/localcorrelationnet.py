@@ -32,7 +32,7 @@ torch.manual_seed(1)
 PARAMS
 """
 BATCH_SIZE = 500
-EPOCH = 100
+EPOCH = 200
 
 INPUT_DIM = 2048
 HIDDEN_DIM1 = 1024
@@ -40,7 +40,7 @@ HIDDEN_DIM2 = 1024
 HIDDEN_DIM3 = 1024
 OUTPUT_DIM = 2048
 
-LR = 0.0005  # TODO: Lower Learning Rate
+LR = 0.0006  # TODO: Lower Learning Rate
 WD = 4e-3
 
 dataset_path = 'data/dataset'
@@ -49,7 +49,7 @@ multiscale = '[1]'
 imsize = 320
 
 USE_IOU = True
-PLOT_FREQ = 20
+PLOT_FREQ = 10
 TEST_FREQ = 10
 posDistThr = 25  # TODO: Try higher range
 negDistThr = 25
@@ -400,7 +400,8 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             pred = D.cpu()
             pred = pred.tolist()
             gt = gps_out.tolist()
-            plot_points(np.array(gt), np.array(pred), 'Training_Tuple', epoch)
+            if len(gt) > 0:
+                plot_points(np.array(gt), np.array(pred), 'Training_Tuple', epoch)
 
         # Only for first batch
         if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))):
@@ -408,8 +409,9 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             D = D.cpu()
             dist_lat.extend(D.tolist())
             dist_gps.extend(gps_out.tolist())
-
-    plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
+    
+    if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))) and (len(dist_gps) > 0):
+        plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
     average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
     tensorboard.add_scalar('Distances/AvgErrorDistance',
                            np.mean(average_dist), epoch)

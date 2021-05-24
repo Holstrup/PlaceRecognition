@@ -176,7 +176,7 @@ def main():
         pool='GeM'      #params.pool
         backbone = 'resnet50'   #params.backbone
         norm = 'L2'       #params.norm
-        model_file = '' #params.model_file
+        model_file = args.network_path #params.model_file
         net = create_model(backbone, pool, norm=norm, mode="single")
         try:
             net.load_state_dict(torch.load(model_file)["model_state_dict"])
@@ -187,10 +187,10 @@ def main():
     net.cuda()
     
     # set up the transform
-    resize = transforms.Resize((240,320), interpolation=2)
+    resize = transforms.Resize((480,640), interpolation=2)
     normalize = transforms.Normalize(
-        mean=net.meta['mean'],
-        std=net.meta['std']
+        mean=[0.485, 0.456, 0.406], #net.meta['mean'],
+        std=[0.229, 0.224, 0.225]  #net.meta['std']
     )
     transform = transforms.Compose([
         resize,
@@ -213,6 +213,7 @@ def main():
 
     # evaluate on test datasets
     datasets = datasets_names
+    OUTPUT_DIM = 2048
     for dataset in datasets: 
         start = time.time()
 
@@ -223,7 +224,7 @@ def main():
         dbLoader = torch.utils.data.DataLoader(
             ImagesFromList(root='', images=[test_dataset.dbImages[i] for i in range(len(test_dataset.dbImages))], imsize=imsize, transform=transform),
             **opt)        
-        poolvecs = torch.zeros(net.meta['outputdim'], len(test_dataset.dbImages)).cuda()
+        poolvecs = torch.zeros(OUTPUT_DIM, len(test_dataset.dbImages)).cuda()
         for i, input in enumerate(dbLoader):
             poolvecs[:, i] = net(input.cuda()).data.squeeze()
 
@@ -233,7 +234,7 @@ def main():
                 ImagesFromList(root='', images=[test_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
                 **opt)
 
-        qvecs = torch.zeros(net.meta['outputdim'], len(qidxs)).cuda()
+        qvecs = torch.zeros(OUTPUT_DIM, len(qidxs)).cuda()
         for i, input in enumerate(qLoader):
             qvecs[:, i] = net(input.cuda()).data.squeeze()
 
