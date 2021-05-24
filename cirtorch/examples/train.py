@@ -20,7 +20,7 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
-from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss, LearntLogTobitLoss, ContrastiveLossVariant, GeneralizedContrastiveLoss, GeneralizedMSELoss, IoUGeneralizedContrastiveLoss
+from cirtorch.layers.loss import ContrastiveLoss, TripletLoss, LinearWeightedContrastiveLoss, LinearOverWeightedContrastiveLoss, RegressionContrastiveLoss, LogTobitLoss, LearntLogTobitLoss, ContrastiveLossVariant, GeneralizedContrastiveLoss, GeneralizedMSELoss, IoUGeneralizedContrastiveLoss, IoUGeneralizedMSELoss
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.testdataset import configdataset
