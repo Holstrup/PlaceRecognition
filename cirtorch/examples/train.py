@@ -39,7 +39,7 @@ model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 pool_names = ['mac', 'spoc', 'gem', 'gemmp']
-loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss', 'ContrastiveWeightedLossVariant', "WeightedGeneralizedContrastiveLoss", "WeightedGeneralizedMSELoss", "IoUWeightedGeneralizedMSELoss"]
+loss_names = ['contrastive', 'triplet', 'LinearWeightedContrastive', 'LinearOverWeightedContrastive', 'RegressionWeightedContrastiveLoss', 'LogTobitWeightedLoss', 'LearntLogTobitWeightedLoss', 'ContrastiveWeightedLossVariant', "WeightedGeneralizedContrastiveLoss", "WeightedGeneralizedMSELoss", "IoUWeightedGeneralizedMSELoss", "IoUWeightedGeneralizedMSEForReal"]
 optimizer_names = ['sgd', 'adam']
 
 
@@ -229,6 +229,8 @@ def main():
         criterion = GeneralizedContrastiveLoss().cuda()
     elif args.loss == 'IoUWeightedGeneralizedMSELoss':
         criterion = IoUGeneralizedContrastiveLoss(margin=args.loss_margin).cuda()
+    elif args.loss == 'IoUWeightedGeneralizedMSEForReal':
+        criterion = IoUGeneralizedMSELoss(margin=args.loss_margin).cuda()
     elif args.loss == 'WeightedGeneralizedMSELoss':
         criterion = GeneralizedMSELoss().cuda()
     else:

@@ -548,6 +548,27 @@ def iou_generalized_contrastive_loss(x, label, ious, margin=0.7, eps=1e-6):
     smoothing_factor = torch.sum(ious[1:])
     return y, smoothing_factor
 
+def iou_mse_contrastive_loss(x, label, ious, margin=0.7, eps=1e-6): 
+
+    # x is D x N
+    dim = x.size(0) # D
+    nq = torch.sum(label.data==-1) # number of tuples
+    S = x.size(1) // nq # number of images per tuple including query: 1+1+n
+
+    x1 = x[:, ::S].permute(1,0).repeat(1,S-1).view((S-1)*nq,dim).permute(1,0)
+    idx = [i for i in range(len(label)) if label.data[i] != -1]
+    x2 = x[:, idx]
+    lbl = label[label!=-1]
+
+    dif = x1 - x2
+    D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
+
+
+    y = 0.5*ious*torch.pow((1-ious) - D,2) + 0.5*(1-ious)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    smoothing_factor = torch.sum(ious[1:])
+    return y, smoothing_factor
+
 def generalized_contrastive_mse_loss(x, label, gps, margin=25, eps=1e-6, alpha=35): 
     # Regular contrastive loss scaled up and then down again (sanity check)
 
