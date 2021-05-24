@@ -551,9 +551,9 @@ def validate(val_loader, model, criterion, epoch):
         gps_info = torch.tensor(gps_info)
         gps_out = torch.flatten(gps_info)
         if 'Weighted' in args.loss:
-            loss = criterion(output, target[q].cuda(), gps_info[q].cuda())
+            loss = criterion(output, torch.cat(target).cuda(), gps_out.cuda())
         else:
-            loss = criterion(output, target[q].cuda())
+            loss = criterion(output, torch.cat(target).cuda())
 
         # record loss
         losses.update(loss.item()/nq, nq)
