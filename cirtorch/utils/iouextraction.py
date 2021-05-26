@@ -1,7 +1,6 @@
 import sys
 sys.path.insert(0, "/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch")
 
-import torchvision.transforms as transforms
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.utils.view_angle import field_of_view, ious, plot_fov
 
@@ -22,7 +21,9 @@ default_cities = {
     'test': ["miami","athens","buenosaires","stockholm","bengaluru","kampala"]
 }
 
-train_dataset = TuplesDataset(
+for city in default_cities[MODE]:
+    data = {}
+    train_dataset = TuplesDataset(
         name='mapillary',
         mode='train',
         qsize=float('Inf'),
@@ -30,11 +31,9 @@ train_dataset = TuplesDataset(
         posDistThr=50,
         negDistThr=50, 
         root_dir = root,
-        cities='zurich',
+        cities=city,
     )
 
-data = {}
-for city in default_cities[MODE]:
     for i, qIdx in enumerate(train_dataset.qpool):
         # qID from qIdx
         qId = train_dataset.qImages[qIdx][-26:-4]
