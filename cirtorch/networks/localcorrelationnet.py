@@ -174,10 +174,10 @@ NETWORK
 """
 
 INPUT_DIM = 2048
-HIDDEN_DIM1 = 1024
-HIDDEN_DIM2 = 1024
-HIDDEN_DIM3 = 1024
-OUTPUT_DIM = 2048 #TODO: Lower Dim & Less Parameters
+HIDDEN_DIM1 = 512
+HIDDEN_DIM2 = 512
+HIDDEN_DIM3 = 512
+OUTPUT_DIM = 128 #TODO: Lower Dim & Less Parameters
 
 class CorrelationNet(torch.nn.Module):
     def __init__(self):
