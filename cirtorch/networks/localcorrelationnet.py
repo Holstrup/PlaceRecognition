@@ -233,12 +233,9 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    #gps = gps.cuda()
-    # TODO: L1 #+ 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
-    y = lbl*torch.pow((D - gps), 2)
+    y = lbl*torch.pow((D - gps), 2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
-
 
 def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
@@ -382,15 +379,10 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         
         output[:, 0] = correlation_model(qvecs[:, i].float())
         q_utm = qcoordinates[q]
-        #print('>', qimages.iloc[[int(qpool[q])]].values[0][0])
         for j, p in enumerate(positives):
-            #pred = correlation_model(poolvecs[:, int(p)].float()).cuda()
-            #output[:, i + 1] = pred / \
-            #    (torch.norm(pred, p=2, dim=0, keepdim=True) + 1e-6)  # L2N
             output[:, j + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
             gps_out[j] = distance(q_utm, pcoordinates[int(p)])  #/ posDistThr
-            #print('>>', dbimages.iloc[[int(p)]].values[0][0], gps_out[i])
-        #print(gps_out[j])
+
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
         loss.backward()
@@ -403,7 +395,6 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             if len(gt) > 0:
                 plot_points(np.array(gt), np.array(pred), 'Training_Tuple', epoch)
 
-        # Only for first batch
         if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))):
             _, D, _ = distances(output, target, gps_out)
             D = D.cpu()
@@ -411,16 +402,21 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             dist_gps.extend(gps_out.tolist())
     
     if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))) and (len(dist_gps) > 0):
+        plot_time = time.time()
         plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
+        tensorboard.add_scalar('Timing/train_plot', plot_time - time.time(), epoch)
+        
     average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
     tensorboard.add_scalar('Distances/AvgErrorDistance',
                            np.mean(average_dist), epoch)
 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
 
+    train_step_time = time.time()
     optimizer.step()
     optimizer.zero_grad()
     scheduler.step()
+    tensorboard.add_scalar('Timing/train_step', train_step_time - time.time(), epoch)
     del output
 
 
@@ -452,17 +448,22 @@ def main():
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
+        epoch_start_time = time.time()
         print(f'====> {epoch}/{EPOCH}')
+
         train(net, criterion, optimizer, scheduler, epoch)
+        tensorboard.add_scalar('Timing/train_epoch', epoch_start_time - time.time(), epoch)
 
         
         if (epoch % TEST_FREQ == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
                 test(net, criterion, epoch)
+                tensorboard.add_scalar('Timing/test_epoch', epoch_start_time - time.time(), epoch)
             
             #torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
-        
 
+start = time.time()
+end = time.time()
 
 if __name__ == '__main__':
     main()
