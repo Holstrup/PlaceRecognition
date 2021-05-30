@@ -233,11 +233,11 @@ def distances(x, label, gps, eps=1e-6):
 
 def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    y = lbl*torch.pow((D - gps), 2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = gps*torch.pow((D - gps), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
-def hubert_loss(x, label, gps, eps=1e-6, margin=25, delta=2.5):
+def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=2.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     if D[0] <= delta:
         y = lbl*torch.pow((dist - D), 2)
