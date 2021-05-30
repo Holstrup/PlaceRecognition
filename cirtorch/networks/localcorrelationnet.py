@@ -1,6 +1,7 @@
 #import sys
 #sys.path.insert(0, "/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch")
 
+import argparse
 import torch
 from torchvision import transforms
 from torch.autograd import Variable
@@ -60,6 +61,8 @@ pool_size = 20000
 t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
 tensorboard = SummaryWriter(
     f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_{t}')
+
+parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
 
 """
 Dataset
@@ -237,13 +240,13 @@ def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
     y = torch.sum(y)
     return y
 
-def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=2.5):
+def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=0.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    if D[0] <= delta:
-        y = lbl*torch.pow((dist - D), 2)
+    if (dist - D) <= delta:
+        y = gps*torch.pow((dist - D), 2)
     else:
-        y = lbl*torch.abs(dist - D) - 1/2 * delta**2
-    y += 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0), 2)
+        y = gps*torch.abs(dist - D) - 1/2 * delta**2
+    y += 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0), 2)
     y = torch.sum(y)
     return y
 
@@ -368,6 +371,8 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     dist_lat = []
     dist_gps = []
     epoch_loss = 0
+
+    acc_forward_pass_time = 0
     for i in range(len(qpool)):
         q = int(qpool[i])
         positives = ppool[i][ppool[i] != -1]
@@ -379,9 +384,11 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
         
         output[:, 0] = correlation_model(qvecs[:, i].float())
         q_utm = qcoordinates[q]
+        forward_pass_time = time.time()
         for j, p in enumerate(positives):
             output[:, j + 1] = correlation_model(poolvecs[:, int(p)].float()).cuda()
             gps_out[j] = distance(q_utm, pcoordinates[int(p)])  #/ posDistThr
+        acc_forward_pass_time += time.time() - forward_pass_time
 
         loss = criterion(output, target.cuda(), gps_out.cuda())
         epoch_loss += loss
@@ -404,23 +411,25 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))) and (len(dist_gps) > 0):
         plot_time = time.time()
         plot_points(np.array(dist_gps), np.array(dist_lat), 'Training', epoch)
-        tensorboard.add_scalar('Timing/train_plot', plot_time - time.time(), epoch)
+        tensorboard.add_scalar('Timing/train_plot', time.time() - plot_time, epoch)
         
     average_dist = np.absolute(np.array(dist_gps) - np.array(dist_lat))
     tensorboard.add_scalar('Distances/AvgErrorDistance',
                            np.mean(average_dist), epoch)
 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
+    tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
 
     train_step_time = time.time()
     optimizer.step()
     optimizer.zero_grad()
     scheduler.step()
-    tensorboard.add_scalar('Timing/train_step', train_step_time - time.time(), epoch)
+    tensorboard.add_scalar('Timing/train_step', time.time() - train_step_time, epoch)
     del output
 
 
 def main():
+    args = parser.parse_args()
     # Load Networks
     net = CorrelationNet()
     #model = load_placereg_net()
@@ -443,7 +452,7 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
-    criterion = mse_loss
+    criterion = args.loss
 
     # Train loop
     losses = np.zeros(EPOCH)
@@ -452,18 +461,15 @@ def main():
         print(f'====> {epoch}/{EPOCH}')
 
         train(net, criterion, optimizer, scheduler, epoch)
-        tensorboard.add_scalar('Timing/train_epoch', epoch_start_time - time.time(), epoch)
+        tensorboard.add_scalar('Timing/train_epoch', time.time() - epoch_start_time, epoch)
 
         
         if (epoch % TEST_FREQ == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
                 test(net, criterion, epoch)
-                tensorboard.add_scalar('Timing/test_epoch', epoch_start_time - time.time(), epoch)
+                tensorboard.add_scalar('Timing/test_epoch', time.time() - epoch_start_time, epoch)
             
             #torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
-
-start = time.time()
-end = time.time()
 
 if __name__ == '__main__':
     main()
