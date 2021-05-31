@@ -62,6 +62,7 @@ t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
 tensorboard = SummaryWriter(
     f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_{t}')
 
+parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
 
 """
@@ -234,7 +235,7 @@ def distances(x, label, gps, eps=1e-6):
     return gps, D, lbl
 
 
-def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
+def mse_loss(x, label, gps, eps=1e-6, margin=0.7):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     y = gps*torch.pow((D - gps), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
@@ -242,10 +243,13 @@ def mse_loss(x, label, gps, eps=1e-6, margin=posDistThr):
 
 def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=0.5):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    if (dist - D) <= delta:
-        y = gps*torch.pow((dist - D), 2)
-    else:
-        y = gps*torch.abs(dist - D) - 1/2 * delta**2
+    delta_tensor = torch.empty(D.size()).fill_(delta).cuda()
+    hubert_cond = torch.where((dist - D) <= delta_tensor, torch.tensor(1.0).cuda(), torch.tensor(0.0).cuda())
+    y = hubert_cond * (gps*torch.pow((dist - D), 2)) + (1-hubert_cond) * (gps*torch.abs(dist - D) - 1/2 * delta**2)
+    #if ((dist - D) <= delta):
+    #    y = gps*torch.pow((dist - D), 2)
+    #else:
+    #    y = gps*torch.abs(dist - D) - 1/2 * delta**2
     y += 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0), 2)
     y = torch.sum(y)
     return y
@@ -373,11 +377,14 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     epoch_loss = 0
 
     acc_forward_pass_time = 0
+    NO_POSITIVES = 0
+    print('query pool', len(qpool))
     for i in range(len(qpool)):
         q = int(qpool[i])
         positives = ppool[i][ppool[i] != -1]
         target = torch.ones(1+len(positives))
         target[0] = -1
+        NO_POSITIVES += len(positives)
 
         output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
         gps_out = torch.ones(len(positives))
@@ -419,7 +426,7 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
     tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
-
+    print('POSITIVES:POSITIVES:  ', NO_POSITIVES)
     train_step_time = time.time()
     optimizer.step()
     optimizer.zero_grad()
@@ -452,7 +459,10 @@ def main():
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
     #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
-    criterion = args.loss
+    if args.loss == 'hubert_loss':
+        criterion = hubert_loss 
+    elif args.loss == 'mse_loss':
+        criterion = mse_loss
 
     # Train loop
     losses = np.zeros(EPOCH)
