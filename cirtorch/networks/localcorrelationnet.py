@@ -246,11 +246,16 @@ def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=0.5):
     delta_tensor = torch.empty(D.size()).fill_(delta).cuda()
     hubert_cond = torch.where((dist - D) <= delta_tensor, torch.tensor(1.0).cuda(), torch.tensor(0.0).cuda())
     y = hubert_cond * (gps*torch.pow((dist - D), 2)) + (1-hubert_cond) * (gps*torch.abs(dist - D) - 1/2 * delta**2)
-    #if ((dist - D) <= delta):
-    #    y = gps*torch.pow((dist - D), 2)
-    #else:
-    #    y = gps*torch.abs(dist - D) - 1/2 * delta**2
     y += 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0), 2)
+    y = torch.sum(y)
+    return y
+
+def logistic_regression(x, label, gps, eps=1e-6, margin=posDistThr):
+    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    ones = torch.tensor(1.0).cuda()
+
+    error = torch.abs(D - gps)
+    y = (ones / (ones + np.exp(-10*(error - 0.5))))
     y = torch.sum(y)
     return y
 
@@ -463,6 +468,8 @@ def main():
         criterion = hubert_loss 
     elif args.loss == 'mse_loss':
         criterion = mse_loss
+    elif args.loss == 'logistic':
+        criterion = logistic_regression
 
     # Train loop
     losses = np.zeros(EPOCH)
