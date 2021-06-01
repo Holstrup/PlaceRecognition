@@ -36,10 +36,10 @@ BATCH_SIZE = 500
 EPOCH = 200
 
 INPUT_DIM = 2048
-HIDDEN_DIM1 = 1024
-HIDDEN_DIM2 = 1024
-HIDDEN_DIM3 = 1024
-OUTPUT_DIM = 2048
+HIDDEN_DIM1 = 512
+HIDDEN_DIM2 = 512
+HIDDEN_DIM3 = 512
+OUTPUT_DIM = 128
 
 LR = 0.0006  # TODO: Lower Learning Rate
 WD = 4e-3
@@ -59,11 +59,11 @@ query_size = 2000
 pool_size = 20000
 
 t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
-tensorboard = SummaryWriter(
-    f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_{t}')
+tensorboard = SummaryWriter(f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{t}')
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
+parser.add_argument('--lr', default=0.0006, type=int, metavar='lr')
 
 """
 Dataset
@@ -176,13 +176,6 @@ def plot_points(ground_truth, prediction, mode, epoch):
 """
 NETWORK
 """
-
-INPUT_DIM = 2048
-HIDDEN_DIM1 = 512
-HIDDEN_DIM2 = 512
-HIDDEN_DIM3 = 512
-OUTPUT_DIM = 128 #TODO: Lower Dim & Less Parameters
-
 class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
@@ -260,6 +253,15 @@ def logistic_regression(x, label, gps, eps=1e-6, margin=posDistThr):
     y = torch.sum(y)
     return y
 
+def binary_classifier(x, label, gps, eps=1e-6, margin=posDistThr):
+    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    half = torch.tensor(0.5).cuda()
+
+    binary_cond = torch.where(gps <= half, torch.tensor(0.0).cuda(), torch.tensor(1.0).cuda())
+    y = torch.abs(D - binary_cond)
+
+    y = torch.sum(y)
+    return y
 
 def dump_data(place_model, correlation_model, loader, epoch):
     place_model.eval()
@@ -383,14 +385,12 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
     epoch_loss = 0
 
     acc_forward_pass_time = 0
-    NO_POSITIVES = 0
-    print('query pool', len(qpool))
+    acc_plot_time = 0
     for i in range(len(qpool)):
         q = int(qpool[i])
         positives = ppool[i][ppool[i] != -1]
         target = torch.ones(1+len(positives))
         target[0] = -1
-        NO_POSITIVES += len(positives)
 
         output = torch.zeros((OUTPUT_DIM, 1+len(positives))).cuda()
         gps_out = torch.ones(len(positives))
@@ -414,12 +414,14 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
             gt = gps_out.tolist()
             if len(gt) > 0:
                 plot_points(np.array(gt), np.array(pred), 'Training_Tuple', epoch)
-
+        
+        plot_time = time.time()
         if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))):
             _, D, _ = distances(output, target, gps_out)
             D = D.cpu()
             dist_lat.extend(D.tolist())
             dist_gps.extend(gps_out.tolist())
+            acc_plot_time += time.time() - plot_time
     
     if (epoch % PLOT_FREQ == 0 or (epoch == (EPOCH-1))) and (len(dist_gps) > 0):
         plot_time = time.time()
@@ -432,12 +434,11 @@ def train(correlation_model, criterion, optimizer, scheduler, epoch):
 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
     tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
-    print('POSITIVES:POSITIVES:  ', NO_POSITIVES)
-    train_step_time = time.time()
+    tensorboard.add_scalar('Timing/plot_time', acc_forward_pass_time, epoch)
+
     optimizer.step()
     optimizer.zero_grad()
     scheduler.step()
-    tensorboard.add_scalar('Timing/train_step', time.time() - train_step_time, epoch)
     del output
 
 
@@ -445,33 +446,24 @@ def main():
     args = parser.parse_args()
     # Load Networks
     net = CorrelationNet()
-    #model = load_placereg_net()
 
     # Move to GPU
     net = net.cuda()
-    #model = model.cuda()
 
-    # Get transformer for dataset
-    #normalize = transforms.Normalize(mean=model.meta['mean'], std=model.meta['std'])
-    #resize = transforms.Resize((int(imsize * 3/4), imsize), interpolation=2)
-
-    # transform = transforms.Compose([
-    #    resize,
-    #    transforms.ToTensor(),
-    #    normalize,
-    # ])
-    # Optimizer, scheduler and criterion
-
-    optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
-    #scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.005, step_size_up=50, cycle_momentum=False)
     if args.loss == 'hubert_loss':
         criterion = hubert_loss 
     elif args.loss == 'mse_loss':
         criterion = mse_loss
     elif args.loss == 'logistic':
         criterion = logistic_regression
+    elif args.loss == 'binary':
+        criterion = binary_classifier
 
+    LR = args.loss
+
+    optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
+    
     # Train loop
     losses = np.zeros(EPOCH)
     for epoch in range(EPOCH):
