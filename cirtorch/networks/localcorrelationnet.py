@@ -255,7 +255,8 @@ def logistic_regression(x, label, gps, eps=1e-6, margin=posDistThr):
     ones = torch.tensor(1.0).cuda()
 
     error = torch.abs(D - gps)
-    y = (ones / (ones + np.exp(-10*(error - 0.5))))
+    ex = torch.exp(-10*(error - 0.5))
+    y = ones / (ones + ex)
     y = torch.sum(y)
     return y
 
