@@ -62,6 +62,7 @@ t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
 tensorboard = SummaryWriter(f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTPUT_DIM}_{t}')
 
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
+parser.add_argument('--name', default='debug', type=str, metavar='N')
 parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
 parser.add_argument('--lr', default=0.0006, type=int, metavar='lr')
 
@@ -479,7 +480,8 @@ def main():
                 test(net, criterion, epoch)
                 tensorboard.add_scalar('Timing/test_epoch', time.time() - epoch_start_time, epoch)
             
-            #torch.save(net.state_dict(), f'data/localcorrelationnet/model_{INPUT_DIM}_{OUTPUT_DIM}_{LR}_Epoch_{epoch}.pth')
+            if args.name != 'debug':
+                torch.save(net.state_dict(), f'data/localnet_exp/{args.name}/model_epoch_{epoch}.pth')
 
 if __name__ == '__main__':
     main()
