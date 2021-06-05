@@ -64,7 +64,7 @@ tensorboard = SummaryWriter(f'data/localcorrelation_runs/model_{INPUT_DIM}_{OUTP
 parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Training')
 parser.add_argument('--name', default='debug', type=str, metavar='N')
 parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
-parser.add_argument('--lr', default=0.0006, type=int, metavar='lr')
+parser.add_argument('--lr', default=0.0006, type=float, metavar='lr')  
 
 """
 Dataset
@@ -460,7 +460,7 @@ def main():
     elif args.loss == 'binary':
         criterion = binary_classifier
 
-    LR = args.loss
+    LR = float(args.lr)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
