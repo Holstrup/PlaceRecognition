@@ -245,14 +245,12 @@ def hubert_loss(x, label, gps, eps=1e-6, margin=0.7, delta=0.5):
     return y
 
 def logistic_regression(x, label, gps, eps=1e-6, margin=posDistThr):
-    dist, D, lbl = distances(x, label, gps, eps=1e-6)
-    ones = torch.tensor(1.0).cuda()
-
-    error = torch.abs(D - gps)
-    ex = torch.exp(-10*(error - 0.5))
-    y = ones / (ones + ex)
-    y = torch.sum(y)
-    return y
+    dist, D, _ = distances(x, label, gps, eps=1e-6)
+    half = torch.tensor(0.5).cuda()
+    lbl = torch.where(gps <= half, torch.tensor(1.0).cuda(), torch.tensor(0.0).cuda())
+    
+    m = y.size()[1]
+    return -(1/m)* torch.sum(lbl*torch.log(D) + (1 - lbl)* torch.log(1-D))
 
 def binary_classifier(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
