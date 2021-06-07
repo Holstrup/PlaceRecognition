@@ -44,6 +44,8 @@ group.add_argument('--network-path', '-npath', metavar='NETWORK',
 group.add_argument('--network-offtheshelf', '-noff', metavar='NETWORK',
                     help="off-the-shelf network, in the format 'ARCHITECTURE-POOLING' or 'ARCHITECTURE-POOLING-{reg-lwhiten-whiten}'," + 
                         " examples: 'resnet101-gem' | 'resnet101-gem-reg' | 'resnet101-gem-whiten' | 'resnet101-gem-lwhiten' | 'resnet101-gem-reg-whiten'")
+group.add_argument('--whitening-network', default=None, type=str) 
+group.add_argument('--whitening-outdim', default=128, type=int) 
 
 # test options
 parser.add_argument('--datasets', '-d', metavar='DATASETS', default='mapillary',
@@ -145,6 +147,16 @@ def main():
     # moving network to gpu and eval mode
     net.cuda()
     net.eval()
+
+    OUTPUT_DIM = net.meta['outputdim']
+
+    if args.whitening_network:
+        whitening_net = torch.load(args.whitening_network)
+        whitening_net.cuda()
+        whitening_net.eval()
+
+        OUTPUT_DIM = args.whitening_outdim
+    
     # set up the transform
     resize = transforms.Resize((240,320), interpolation=2)
     normalize = transforms.Normalize(
@@ -182,9 +194,12 @@ def main():
         dbLoader = torch.utils.data.DataLoader(
             ImagesFromList(root='', images=[test_dataset.dbImages[i] for i in range(len(test_dataset.dbImages))], imsize=imsize, transform=transform),
             **opt)        
-        poolvecs = torch.zeros(net.meta['outputdim'], len(test_dataset.dbImages)).cuda()
+        poolvecs = torch.zeros(OUTPUT_DIM, len(test_dataset.dbImages)).cuda()
         for i, input in enumerate(dbLoader):
-            poolvecs[:, i] = net(input.cuda()).data.squeeze()
+            if args.whitening_network:
+                qvecs[:, i] = whitening_net(net(input.cuda()).data.squeeze())
+            else:
+                poolvecs[:, i] = net(input.cuda()).data.squeeze()
 
         # Step 2: Extract Query Images - qLoader
         print('>> {}: Extracting Query Images...'.format(dataset))
@@ -192,9 +207,12 @@ def main():
                 ImagesFromList(root='', images=[test_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
                 **opt)
 
-        qvecs = torch.zeros(net.meta['outputdim'], len(qidxs)).cuda()
+        qvecs = torch.zeros(OUTPUT_DIM, len(qidxs)).cuda()
         for i, input in enumerate(qLoader):
-            qvecs[:, i] = net(input.cuda()).data.squeeze()
+            if args.whitening_network:
+                qvecs[:, i] = whitening_net(net(input.cuda()).data.squeeze())
+            else:
+                qvecs[:, i] = net(input.cuda()).data.squeeze()
 
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
@@ -219,13 +237,12 @@ def main():
                 ps = [test_dataset.dbImages[i].split('/')[-1][:-4] for i in points]
                 for i in range(len(ps)):
                     ps[i] = distance(qcoor, gpsinfo[ps[i]])
-                #print(gpsinfo[q], gpsinfo[ps[0]])i
-                #embeddingdistances[qidx] = np.array(scores[qidx,:k])
+
                 ps = np.array(ps)
                 embed = np.array(scores[qidx,:k])
                 gpsdistances[qidx,:] = ps
                 embeddingdistances[qidx,:] = embed
-                #print(q, ps, embed)
+
             print(gpsdistances)
             np.savetxt("gps.csv", gpsdistances, delimiter=",")
             np.savetxt("embedding.csv", embeddingdistances, delimiter=",")
