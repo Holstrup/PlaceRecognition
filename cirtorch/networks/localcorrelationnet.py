@@ -185,6 +185,7 @@ class CorrelationNet(torch.nn.Module):
         #self.hidden12 = torch.nn.Dropout(p=0.1)
         #self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         #self.hidden2o = torch.nn.Dropout(p=0.2)
+        self.softmax = torch.nn.Softmax(dim=0)
         self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
 
     def forward(self, x):
@@ -195,6 +196,7 @@ class CorrelationNet(torch.nn.Module):
         #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
+        x = self.softmax(x)
         return x
 
 
@@ -249,8 +251,8 @@ def logistic_regression(x, label, gps, eps=1e-6, margin=posDistThr):
     half = torch.tensor(0.5).cuda()
     lbl = torch.where(gps <= half, torch.tensor(1.0).cuda(), torch.tensor(0.0).cuda())
     
-    m = y.size()[1]
-    return -(1/m)* torch.sum(lbl*torch.log(D) + (1 - lbl)* torch.log(1-D))
+    m = gps.size()[0]
+    return (1/m)* torch.sum(-lbl*torch.log(D) - (1 - lbl)* torch.log(1-D))
 
 def binary_classifier(x, label, gps, eps=1e-6, margin=posDistThr):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
