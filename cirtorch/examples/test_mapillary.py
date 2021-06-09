@@ -5,6 +5,7 @@ import pickle
 import pdb
 
 import numpy as np
+import sklearn
 
 import torch
 from torch.utils.model_zoo import load_url
@@ -63,6 +64,8 @@ parser.add_argument('--whitening', '-w', metavar='WHITENING', default=None, choi
                         " (default: None)")
 parser.add_argument('--generate-plot', default=False, type=bool, metavar='PLOT',
                     help='Generates a plot over embedding distance and geographical distance')
+
+parser.add_argument('--pca', default=False, type=bool, metavar='Whitening_PCA')
 
 # GPU ID
 parser.add_argument('--gpu-id', '-g', default='0', metavar='N',
@@ -213,6 +216,13 @@ def main():
                 qvecs[:, i] = whitening_net(net(input.cuda()).data.squeeze())
             else:
                 qvecs[:, i] = net(input.cuda()).data.squeeze()
+        
+        if args.pca:
+            pca = sklearn.decomposition.PCA(n_components=128)
+            pca.fit(poolvecs)
+
+            poolvecs = pca.transform(poolvecs)
+            qvecs = pca.transform(qvecs)
 
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)
