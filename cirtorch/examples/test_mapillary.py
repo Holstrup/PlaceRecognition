@@ -20,6 +20,7 @@ from cirtorch.utils.download import download_train, download_test
 from cirtorch.utils.whiten import whitenlearn, whitenapply
 from cirtorch.utils.evaluate import mapk, recall
 from cirtorch.utils.general import get_data_root, htime
+from cirtorch.networks.localcorrelationnet import CorrelationNet
 
 PRETRAINED = {
     'retrievalSfM120k-vgg16-gem'        : 'http://cmp.felk.cvut.cz/cnnimageretrieval/data/networks/retrieval-SfM-120k/retrievalSfM120k-vgg16-gem-b4dcdc6.pth',
@@ -45,8 +46,8 @@ group.add_argument('--network-path', '-npath', metavar='NETWORK',
 group.add_argument('--network-offtheshelf', '-noff', metavar='NETWORK',
                     help="off-the-shelf network, in the format 'ARCHITECTURE-POOLING' or 'ARCHITECTURE-POOLING-{reg-lwhiten-whiten}'," + 
                         " examples: 'resnet101-gem' | 'resnet101-gem-reg' | 'resnet101-gem-whiten' | 'resnet101-gem-lwhiten' | 'resnet101-gem-reg-whiten'")
-group.add_argument('--whitening-network', default=None, type=str) 
-group.add_argument('--whitening-outdim', default=128, type=int) 
+parser.add_argument('--whitening-network', default=None, type=str) 
+parser.add_argument('--whitening-outdim', default=128, type=int) 
 
 # test options
 parser.add_argument('--datasets', '-d', metavar='DATASETS', default='mapillary',
@@ -154,9 +155,15 @@ def main():
     OUTPUT_DIM = net.meta['outputdim']
 
     if args.whitening_network:
-        whitening_net = torch.load(args.whitening_network)
+        state = torch.load(args.whitening_network) 
+        whitening_net = CorrelationNet()
+        whitening_net.load_state_dict(state) 
         whitening_net.cuda()
         whitening_net.eval()
+
+        #whitening_net = torch.load(args.whitening_network)
+        #whitening_net.cuda()
+        #whitening_net.eval()
 
         OUTPUT_DIM = args.whitening_outdim
     
@@ -179,7 +186,7 @@ def main():
         imsize=imsize,
         transform=transform,
         posDistThr=posDistThr,
-        negDistThr=negDistThr
+        negDistThr=negDistThr,
     )
     qidxs, pidxs = test_dataset.get_loaders()
 
@@ -218,11 +225,20 @@ def main():
                 qvecs[:, i] = net(input.cuda()).data.squeeze()
         
         if args.pca:
-            pca = sklearn.decomposition.PCA(n_components=128)
-            pca.fit(poolvecs)
+            poolvecs = poolvecs.cpu()
+            qvecs = qvecs.cpu()
 
-            poolvecs = pca.transform(poolvecs)
-            qvecs = pca.transform(qvecs)
+            pca = sklearn.decomposition.PCA(n_components=2048)
+            pca.fit(poolvecs.T)
+
+            poolvecs = pca.transform(poolvecs.T)
+            qvecs = pca.transform(qvecs.T)
+            
+            poolvecs = torch.from_numpy(poolvecs).cuda()
+            qvecs = torch.from_numpy(qvecs).cuda()
+
+            poolvecs = poolvecs.T
+            qvecs = qvecs.T
 
         # Step 3: Ranks 
         scores = torch.mm(poolvecs.t(), qvecs)

@@ -39,7 +39,7 @@ INPUT_DIM = 2048
 HIDDEN_DIM1 = 512
 HIDDEN_DIM2 = 512
 HIDDEN_DIM3 = 512
-OUTPUT_DIM = 128
+OUTPUT_DIM = 2048
 
 LR = 0.0006  # TODO: Lower Learning Rate
 WD = 4e-3
@@ -56,7 +56,7 @@ TEST_FREQ = 10
 posDistThr = 15  # TODO: Try higher range
 negDistThr = 25
 workers = 8
-query_size = 2000
+query_size =2000
 pool_size = 20000
 
 t = time.strftime("%Y-%d-%m_%H:%M:%S", time.localtime())
@@ -158,13 +158,13 @@ NETWORK
 class CorrelationNet(torch.nn.Module):
     def __init__(self):
         super(CorrelationNet, self).__init__()
-        self.input = torch.nn.Linear(INPUT_DIM, HIDDEN_DIM1)
+        self.input = torch.nn.Linear(INPUT_DIM, INPUT_DIM)
         #self.hidden1 = torch.nn.Linear(HIDDEN_DIM1, HIDDEN_DIM2)
         #self.hidden12 = torch.nn.Dropout(p=0.1)
         #self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         #self.hidden2o = torch.nn.Dropout(p=0.2)
         self.softmax = torch.nn.Softmax(dim=0)
-        self.output = torch.nn.Linear(HIDDEN_DIM3, OUTPUT_DIM)
+        self.output = torch.nn.Linear(INPUT_DIM, OUTPUT_DIM)
 
     def forward(self, x):
         x = F.leaky_relu(self.input(x))
@@ -173,8 +173,8 @@ class CorrelationNet(torch.nn.Module):
         #x = self.hidden12(x)
         #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
-        x = self.output(x)
-        x = self.softmax(x)
+        x = F.leaky_relu(self.output(x))
+        #x = self.softmax(x)
         return x
 
 
@@ -208,9 +208,20 @@ def distances(x, label, gps, eps=1e-6):
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
     return gps, D, lbl
 
+def contrastive(x, label, gps, eps=1e-6, margin=0.7):
+    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    D = D.cuda() 
+    gps = gps.cuda()
+    
+    y = gps*torch.pow((D), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y
 
 def mse_loss(x, label, gps, eps=1e-6, margin=0.7):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    D = D.cuda()
+    gps = gps.cuda()
+
     y = gps*torch.pow((D - gps), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
@@ -358,7 +369,7 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
     place_net.eval()
     correlation_model.train()
 
-    RANDOM_TUPLE = random.randint(0, len(qpool)-1)
+    RANDOM_TUPLE = random.randint(0, 100)
     avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_net)
     tensorboard.add_scalar('Loss/AvgNegDistanceTrain', avg_neg_distance, epoch)
 
@@ -387,8 +398,8 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
             gps_out = torch.tensor(gps_info[q])
             loss = criterion(output, target[q].cuda(), gps_out)
             epoch_loss += loss
-            loss.backward()   
-        
+            loss.backward()
+
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
     tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
 
@@ -431,8 +442,9 @@ def main():
         negDistThr=negDistThr, 
         root_dir = 'data',
         tuple_mining='default'
+        ###cities='debug'
     )
-
+    """
     val_dataset = TuplesDataset(
             name='mapillary',
             mode='val',
@@ -447,6 +459,7 @@ def main():
             cities='debug',
             tuple_mining='gps'
     )
+    """
 
     # Dataloaders
     train_loader = torch.utils.data.DataLoader(
@@ -455,12 +468,13 @@ def main():
             drop_last=True, collate_fn=collate_tuples
     )
 
-
+    """
     val_loader = torch.utils.data.DataLoader(
             val_dataset, batch_size=(BATCH_SIZE - 100), shuffle=False,
             num_workers=workers, pin_memory=True,
             drop_last=True, collate_fn=collate_tuples
     )
+    """
 
     if args.loss == 'hubert_loss':
         criterion = hubert_loss 
@@ -470,6 +484,8 @@ def main():
         criterion = logistic_regression
     elif args.loss == 'binary':
         criterion = binary_classifier
+    elif args.loss == 'contrastive':
+        criterion = contrastive
 
     LR = float(args.lr)
 
