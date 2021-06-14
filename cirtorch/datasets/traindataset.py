@@ -10,6 +10,7 @@ import torch.utils.data as data
 import sys
 from sklearn.neighbors import NearestNeighbors
 import random
+import json
 
 from cirtorch.datasets.datahelpers import default_loader, imresize, cid2filename
 from cirtorch.datasets.genericdataset import ImagesFromList
@@ -116,6 +117,7 @@ class TuplesDataset(data.Dataset):
             self.query_keys_with_no_match = []
             self.gpsInfo = {}
             self.angleInfo = {}
+            self.iouInfo = {}
             self.tuple_mining = tuple_mining
 
             # define sequence length based on task
@@ -138,7 +140,9 @@ class TuplesDataset(data.Dataset):
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
+                    qIous = json.loads(open(join(root_dir, subdir, city, 'query', 'ious.json'), 'r').read())
                     self.addGpsInfo(qData, qDataRaw)
+                    self.addIoUInfo(qIous)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
@@ -352,6 +356,9 @@ class TuplesDataset(data.Dataset):
         
         for index, row in dataframe_raw.iterrows():
             self.angleInfo[row['key']] = [row['ca']]
+    
+    def addIoUInfo(self, jsondata):
+        self.iouInfo.update(jsondata)
 
     def __calcSamplingWeights__(self):
         # length of query
@@ -408,7 +415,7 @@ class TuplesDataset(data.Dataset):
 
         return seq_keys, np.asarray(seq_idxs)
 
-    def __getitem__(self, index):
+    def __getitem2__(self, index):
         """
         Args:
             index (int): Index
@@ -441,6 +448,41 @@ class TuplesDataset(data.Dataset):
         #distances = self.getGpsInformation(index, pos_index) # GPS Distance
         distances = self.getIouInformation(index, pos_index)  # IoU Distance
         return (output, target, distances)
+    
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            images tuple (q,p,n1,...,nN): Loaded train/val tuple at index of self.qidxs
+        """
+        if self.__len__() == 0:
+            raise(RuntimeError("List qidxs is empty. Run ``dataset.create_epoch_tuples(net)`` method to create subset for train/val!"))
+
+        output = []
+        # query image
+        output.append(self.loader(self.qImages[self.qidxs[index]]))
+
+        # positive images
+        for i in range(len(self.pidxs[index])):
+            output.append(self.loader(self.dbImages[self.pidxs[index]][i])) 
+
+        # negative images
+        for i in range(len(self.nidxs[index])):
+            output.append(self.loader(self.dbImages[self.nidxs[index][i]]))
+
+        if self.imsize is not None:
+            output = [imresize(img, self.imsize) for img in output]
+        
+        if self.transform is not None:
+            output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
+
+        target = torch.Tensor([-1] [1]*len(self.pidxs[index]) + [0]*len(self.nidxs[index]))
+        
+        #distances = self.getGpsInformation(index, pos_index) # GPS Distance
+        distances = self.getIouInformationFull(index)  # IoU Distance
+        return (output, target, distances)
 
     def getGpsAndAngle(self, idx):
         return self.gpsInfo.get(idx) + self.angleInfo.get(idx)
@@ -454,6 +496,19 @@ class TuplesDataset(data.Dataset):
             nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
             distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(nid)))
         return distances
+
+    def getIouInformationFull(self, index):
+        distances = []
+        qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
+
+        for i in range(len(self.pidxs[index])):
+            pid = self.dbImages[self.pidxs[index]][i].split('/')[-1][:-4]
+            distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid)))
+        for i in range(len(self.nidxs[index])):
+            nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
+            distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(nid)))
+        return distances
+    
     
     def getGpsInformation(self, index, pos_index):
         distances = []
