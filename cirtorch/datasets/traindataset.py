@@ -140,9 +140,9 @@ class TuplesDataset(data.Dataset):
                     # load query data
                     qData = pd.read_csv(join(root_dir, subdir, city, 'query', 'postprocessed.csv'), index_col = 0)
                     qDataRaw = pd.read_csv(join(root_dir, subdir, city, 'query', 'raw.csv'), index_col = 0)
-                    qIous = json.loads(open(join(root_dir, subdir, city, 'query', 'ious.json'), 'r').read())
+                    #qIous = json.loads(open(join(root_dir, subdir, city, 'query', 'ious.json'), 'r').read())
                     self.addGpsInfo(qData, qDataRaw)
-                    self.addIoUInfo(qIous)
+                    #self.addIoUInfo(qIous)
 
                     # load database data
                     dbData = pd.read_csv(join(root_dir, subdir, city, 'database', 'postprocessed.csv'), index_col = 0)
@@ -348,7 +348,21 @@ class TuplesDataset(data.Dataset):
         idxs2qpool = torch.randperm(len(self.qpool))
         self.qidxs = [self.qpool[i] for i in range(len(self.qpool))]
         self.pidxs = [self.ppool[i] for i in range(len(self.ppool))]
+        self.filter_positive_loader()
         return self.qidxs, self.pidxs
+    
+    def filter_positive_loader(self):
+        for i, q in enumerate(self.qidxs):
+            true_positives = []
+            qid = self.qImages[self.qidxs[i]].split('/')[-1][:-4]
+
+            for j in range(len(self.pidxs[i])):
+                pid = self.dbImages[self.pidxs[i]][j].split('/')[-1][:-4]
+                iou_dist = self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid))
+                if iou_dist >= 0.5:
+                    true_positives.append(self.pidxs[i])
+            
+            self.pidxs[i] = true_positives
 
     def addGpsInfo(self, dataframe, dataframe_raw):
         for index, row in dataframe.iterrows():
@@ -478,7 +492,7 @@ class TuplesDataset(data.Dataset):
         if self.transform is not None:
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
-        target = torch.Tensor([-1] [1]*len(self.pidxs[index]) + [0]*len(self.nidxs[index]))
+        target = torch.Tensor([-1] + [1]*len(self.pidxs[index]) + [0]*len(self.nidxs[index]))
         
         #distances = self.getGpsInformation(index, pos_index) # GPS Distance
         distances = self.getIouInformationFull(index)  # IoU Distance
