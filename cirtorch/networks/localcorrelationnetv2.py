@@ -21,7 +21,7 @@ import csv
 import random
 
 from cirtorch.datasets.genericdataset import ImagesFromList
-from cirtorch.datasets.genericdataset import ImagesFromList
+from cirtorch.utils.evaluate import compute_map_and_print, mapk, recall
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.datahelpers import collate_tuples, cid2filename
@@ -213,7 +213,7 @@ def contrastive(x, label, gps, eps=1e-6, margin=0.7):
     D = D.cuda() 
     gps = gps.cuda()
     
-    y = gps*torch.pow((D), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow(D, 2) + 0.5*(1-lbl)*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -295,7 +295,7 @@ def dump_data(place_model, correlation_model, loader, epoch):
     # writer.writerows(images)
 
 
-def test(correlation_model, criterion, epoch):
+def test_correlation(correlation_model, criterion, epoch):
     qvecs_test = torch.from_numpy(np.loadtxt(
         f'{dataset_path}/val/qvecs.txt', delimiter=','))
     poolvecs_test = torch.from_numpy(np.loadtxt(
@@ -391,14 +391,15 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
             forward_pass_time = time.time()
             for imi in range(ni):
                 # compute output vector for image imi
-                x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
-                output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
+                #x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
+                #output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
+                output[:, imi] = correlation_model(place_net(input[q][imi].cuda()).squeeze())
             acc_forward_pass_time += time.time() - forward_pass_time
 
             gps_out = torch.tensor(gps_info[q])
             loss = criterion(output, target[q].cuda(), gps_out)
-            epoch_loss += loss
             loss.backward()
+            epoch_loss += loss
 
     tensorboard.add_scalar('Loss/train', epoch_loss, epoch)
     tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
@@ -408,6 +409,128 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
     scheduler.step()
     del output
 
+def validation(val_loader, place_net, correlation_model, criterion, epoch):
+    # train mode
+    place_net.eval()
+    correlation_model.eval()
+
+    avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_net)
+    tensorboard.add_scalar('Loss/AvgNegDistanceVal', avg_neg_distance, epoch)
+
+    epoch_loss = 0
+    acc_forward_pass_time = 0
+    for i, (input, target, gps_info) in enumerate(val_loader):       
+        nq = len(input) # number of training tuples
+        ni = len(input[0]) # number of images per tuple
+
+        for q in range(nq):
+            output = torch.zeros(OUTPUT_DIM, ni).cuda()
+            forward_pass_time = time.time()
+            for imi in range(ni):
+                # compute output vector for image imi
+                #x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
+                #output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
+                output[:, imi] = correlation_model(place_net(input[q][imi].cuda()).squeeze())
+            acc_forward_pass_time += time.time() - forward_pass_time
+
+            gps_out = torch.tensor(gps_info[q])
+            loss = criterion(output, target[q].cuda(), gps_out)
+            epoch_loss += loss
+
+    tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
+    tensorboard.add_scalar('Timing/forward_pass_time_val', acc_forward_pass_time, epoch)
+    
+    del output
+
+def test(place_net, correlation_model):
+
+    print('>> Evaluating network on test datasets...')
+
+    # for testing we use image size of max 1024
+    imsize = 1024
+
+    posDistThr = 25
+    negDistThr = 25
+
+    # moving network to gpu and eval mode
+    place_net.cuda()
+    place_net.eval()
+
+    correlation_model.cuda()
+    correlation_model.eval()
+    # set up the transform
+    resize = transforms.Resize((240,320), interpolation=2)
+    # Get transformer for dataset
+    normalize = transforms.Normalize(mean=place_net.meta['mean'], std=place_net.meta['std'])
+    resize = transforms.Resize((int(imsize * 3/4), imsize), interpolation=2)
+
+    transform = transforms.Compose([
+        resize,
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    test_dataset = TuplesDataset(
+        name='mapillary+',
+        mode='val', # Test on validation set during training
+        imsize=imsize,
+        nnum=5,
+        qsize=query_size,
+        poolsize=pool_size,
+        transform=transform,
+        posDistThr=posDistThr,
+        negDistThr=negDistThr,
+        root_dir = 'data'
+    )
+
+    qidxs, pidxs = test_dataset.get_loaders()
+
+    opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
+
+    # evaluate on test datasets
+    datasets = ['mapillary'] #args.test_datasets.split(',')
+    for dataset in datasets: 
+        start = time.time()
+
+        print('>> {}: Extracting...'.format(dataset))
+        
+        # Step 1: Extract Database Images - dbLoader
+        print('>> {}: Extracting Database Images...'.format(dataset))
+        dbLoader = torch.utils.data.DataLoader(
+            ImagesFromList(root='', images=[test_dataset.dbImages[i] for i in range(len(test_dataset.dbImages))], imsize=imsize, transform=transform),
+            **opt)        
+        
+        poolvecs = torch.zeros(OUTPUT_DIM, len(test_dataset.dbImages)).cuda()
+        for i, input in enumerate(dbLoader):
+            poolvecs[:, i] = correlation_model(place_net(input.cuda()).data.squeeze())
+
+        # Step 2: Extract Query Images - qLoader
+        print('>> {}: Extracting Query Images...'.format(dataset))
+        qLoader = torch.utils.data.DataLoader(
+                ImagesFromList(root='', images=[test_dataset.qImages[i] for i in qidxs], imsize=imsize, transform=transform),
+                **opt)
+
+        qvecs = torch.zeros(OUTPUT_DIM, len(qidxs)).cuda()
+        for i, input in enumerate(qLoader):
+            qvecs[:, i] = correlation_model(place_net(input.cuda()).data.squeeze())
+
+        # Step 3: Ranks 
+        scores = torch.mm(poolvecs.t(), qvecs)
+        scores, ranks = torch.sort(scores, dim=0, descending=True) #Dim1? 
+        ranks = ranks.cpu().numpy()
+        ranks = np.transpose(ranks)
+
+        scores = scores.cpu().numpy()
+        scores = np.transpose(scores)
+
+        print('>> {}: Computing Recall and Map'.format(dataset))
+        k = 5
+        ks = [5]
+        mean_ap = mapk(ranks, pidxs, k)
+        rec = recall(ranks, pidxs, ks)
+
+        print('>> Achieved mAP: {} and Recall {}'.format(mean_ap, rec))
+        return mean_ap, rec
 
 def main():
     args = parser.parse_args()
@@ -444,7 +567,7 @@ def main():
         tuple_mining='default'
         ###cities='debug'
     )
-    """
+    
     val_dataset = TuplesDataset(
             name='mapillary',
             mode='val',
@@ -456,10 +579,9 @@ def main():
             posDistThr=posDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            cities='debug',
-            tuple_mining='gps'
+            tuple_mining='default'
     )
-    """
+    
 
     # Dataloaders
     train_loader = torch.utils.data.DataLoader(
@@ -468,13 +590,13 @@ def main():
             drop_last=True, collate_fn=collate_tuples
     )
 
-    """
+    
     val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=(BATCH_SIZE - 100), shuffle=False,
+            val_dataset, batch_size=BATCH_SIZE, shuffle=False,
             num_workers=workers, pin_memory=True,
             drop_last=True, collate_fn=collate_tuples
     )
-    """
+    
 
     if args.loss == 'hubert_loss':
         criterion = hubert_loss 
@@ -504,7 +626,9 @@ def main():
         
         if (epoch % TEST_FREQ == 0 or (epoch == (EPOCH-1))):
             with torch.no_grad():
-                test(net, criterion, epoch)
+                validation(val_loader, place_net, net, criterion, epoch)
+                test_correlation(net, criterion, epoch)
+                test(place_net, net)
                 tensorboard.add_scalar('Timing/test_epoch', time.time() - epoch_start_time, epoch)
             
             if args.name != 'debug':
