@@ -222,7 +222,7 @@ def mse_loss(x, label, gps, eps=1e-6, margin=0.7):
     D = D.cuda()
     gps = gps.cuda()
 
-    y = gps*torch.pow((D - gps), 2) + 0.5*(1-gps)*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = (1-gps)*torch.pow((D - gps), 2) + 0.5*gps*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -564,7 +564,7 @@ def main():
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        tuple_mining='default'
+        tuple_mining='default',
         ###cities='debug'
     )
     
