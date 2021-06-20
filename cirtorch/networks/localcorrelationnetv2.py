@@ -164,17 +164,18 @@ class CorrelationNet(torch.nn.Module):
         #self.hidden12 = torch.nn.Dropout(p=0.1)
         #self.hidden2 = torch.nn.Linear(HIDDEN_DIM2, HIDDEN_DIM3)
         #self.hidden2o = torch.nn.Dropout(p=0.2)
-        self.softmax = torch.nn.Softmax(dim=0)
+        #self.softmax = torch.nn.Softmax(dim=0)
         self.output = torch.nn.Linear(INPUT_DIM, OUTPUT_DIM)
 
     def forward(self, x):
-        x = F.leaky_relu(self.input(x))
+        x = self.input(x)
         #x = F.leaky_relu(self.hidden1(x))
         #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden12(x)
         #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
-        x = F.leaky_relu(self.output(x))
+        x = self.output(x)
+        x = x / (torch.norm(x, p=2, dim=1, keepdim=True) + 1e-6).expand_as(x) # L2 Norm
         #x = self.softmax(x)
         return x
 
@@ -365,13 +366,16 @@ def log_tuple(input, batchid, gps_info):
 
 # Train loop
 def train(train_loader, place_net, correlation_model, criterion, optimizer, scheduler, epoch):
+    avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_net, correlation_model)
+    tensorboard.add_scalar('Loss/AvgNegDistanceTrain', avg_neg_distance, epoch)
+
     # train mode
     place_net.eval()
     correlation_model.train()
 
+    optimizer.zero_grad()
+
     RANDOM_TUPLE = random.randint(0, 100)
-    avg_neg_distance = train_loader.dataset.create_epoch_tuples(place_net)
-    tensorboard.add_scalar('Loss/AvgNegDistanceTrain', avg_neg_distance, epoch)
 
     dist_lat = []
     dist_gps = []
@@ -391,8 +395,6 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
             forward_pass_time = time.time()
             for imi in range(ni):
                 # compute output vector for image imi
-                #x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
-                #output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
                 output[:, imi] = correlation_model(place_net(input[q][imi].cuda()).squeeze())
             acc_forward_pass_time += time.time() - forward_pass_time
 
@@ -405,17 +407,17 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
     tensorboard.add_scalar('Timing/forward_pass_time', acc_forward_pass_time, epoch)
 
     optimizer.step()
-    optimizer.zero_grad()
     scheduler.step()
+    optimizer.zero_grad()
     del output
 
 def validation(val_loader, place_net, correlation_model, criterion, epoch):
+    avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_net, correlation_model)
+    tensorboard.add_scalar('Loss/AvgNegDistanceVal', avg_neg_distance, epoch)
+    
     # train mode
     place_net.eval()
     correlation_model.eval()
-
-    avg_neg_distance = val_loader.dataset.create_epoch_tuples(place_net)
-    tensorboard.add_scalar('Loss/AvgNegDistanceVal', avg_neg_distance, epoch)
 
     epoch_loss = 0
     acc_forward_pass_time = 0
@@ -428,15 +430,11 @@ def validation(val_loader, place_net, correlation_model, criterion, epoch):
             forward_pass_time = time.time()
             for imi in range(ni):
                 # compute output vector for image imi
-                #x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
-                #output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
-                output[:, q*ni + imi] = place_net(input[q][imi].cuda()).squeeze() # correlation_model(place_net(input[q][imi].cuda()).squeeze())
+                output[:, q*ni + imi] = place_net(input[q][imi].cuda()).squeeze()
             acc_forward_pass_time += time.time() - forward_pass_time
 
             gps_out = torch.tensor(gps_info[q])
-            loss = contrastive_loss(output, torch.cat(target).cuda())
-            #loss = criterion(output, torch.cat(target).cuda(), gps_out.cuda())
-            #loss = criterion(output, target[q].cuda(), gps_out)
+            loss = contrastive_loss(output, torch.cat(target).cuda())       
             epoch_loss += loss
 
     tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
@@ -567,7 +565,7 @@ def main():
         posDistThr=posDistThr,
         negDistThr=negDistThr, 
         root_dir = 'data',
-        tuple_mining='default',
+        tuple_mining='whitening',
     )
     
     val_dataset = TuplesDataset(
@@ -581,7 +579,7 @@ def main():
             posDistThr=posDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            tuple_mining='default',
+            tuple_mining='whitening',
     )
     
 
