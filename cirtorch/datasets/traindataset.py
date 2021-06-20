@@ -352,17 +352,27 @@ class TuplesDataset(data.Dataset):
         return self.qidxs, self.pidxs
     
     def filter_positive_loader(self):
+        before = 0
+        after = 0
         for i, q in enumerate(self.qidxs):
             true_positives = []
             qid = self.qImages[self.qidxs[i]].split('/')[-1][:-4]
 
             for j in range(len(self.pidxs[i])):
-                pid = self.dbImages[self.pidxs[i]][j].split('/')[-1][:-4]
+                pid = self.dbImages[self.pidxs[i][j]].split('/')[-1][:-4]
                 iou_dist = self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid))
-                if iou_dist >= 0.5:
-                    true_positives.append(self.pidxs[i])
-            
+                if iou_dist >= 0.5: #>= 0.5
+                    true_positives.append(self.pidxs[i][j])
+                if (iou_dist > 0.5):
+                    print(qid, pid)
+                    print(self.qImages[self.qidxs[i]], self.dbImages[self.pidxs[i][j]])
+                    print(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid), iou_dist, '\n')
+            before += len(self.pidxs[i]) 
             self.pidxs[i] = true_positives
+            after +=len(self.pidxs[i])
+        before /= len(self.qidxs)
+        after /= len(self.qidxs)
+        print(before, after) 
 
     def addGpsInfo(self, dataframe, dataframe_raw):
         for index, row in dataframe.iterrows():
@@ -429,7 +439,7 @@ class TuplesDataset(data.Dataset):
 
         return seq_keys, np.asarray(seq_idxs)
 
-    def __getitem2__(self, index):
+    def __getitem__(self, index):
         """
         Args:
             index (int): Index
@@ -463,7 +473,7 @@ class TuplesDataset(data.Dataset):
         distances = self.getIouInformation(index, pos_index)  # IoU Distance
         return (output, target, distances)
     
-    def __getitem__(self, index):
+    def __getitem2__(self, index):
         """
         Args:
             index (int): Index
@@ -479,8 +489,9 @@ class TuplesDataset(data.Dataset):
         output.append(self.loader(self.qImages[self.qidxs[index]]))
 
         # positive images
-        for i in range(len(self.pidxs[index])):
-            output.append(self.loader(self.dbImages[self.pidxs[index]][i])) 
+        ps = min(5, len(self.pidxs[index]))
+        for i in range(ps):
+            output.append(self.loader(self.dbImages[self.pidxs[index][i]])) 
 
         # negative images
         for i in range(len(self.nidxs[index])):
@@ -492,7 +503,7 @@ class TuplesDataset(data.Dataset):
         if self.transform is not None:
             output = [self.transform(output[i]).unsqueeze_(0) for i in range(len(output))]
 
-        target = torch.Tensor([-1] + [1]*len(self.pidxs[index]) + [0]*len(self.nidxs[index]))
+        target = torch.Tensor([-1] + [1]*ps + [0]*len(self.nidxs[index]))
         
         #distances = self.getGpsInformation(index, pos_index) # GPS Distance
         distances = self.getIouInformationFull(index)  # IoU Distance
@@ -514,9 +525,9 @@ class TuplesDataset(data.Dataset):
     def getIouInformationFull(self, index):
         distances = []
         qid = self.qImages[self.qidxs[index]].split('/')[-1][:-4]
-
-        for i in range(len(self.pidxs[index])):
-            pid = self.dbImages[self.pidxs[index]][i].split('/')[-1][:-4]
+        ps = min(5, len(self.pidxs[index]))
+        for i in range(ps):
+            pid = self.dbImages[self.pidxs[index][i]].split('/')[-1][:-4]
             distances.append(self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid)))
         for i in range(len(self.nidxs[index])):
             nid = self.dbImages[self.nidxs[index][i]].split('/')[-1][:-4]
@@ -559,7 +570,7 @@ class TuplesDataset(data.Dataset):
         return torch.norm(torch.tensor(query) - torch.tensor(positive), dim=-1)
 
     def ioudistance(self, query, positive):
-        pol = field_of_view([query, positive])
+        pol = field_of_view([query, positive], convert_to_radians=True)
         return ious(pol[0], pol[1:])[0]
 
     def create_epoch_tuples(self, net):
