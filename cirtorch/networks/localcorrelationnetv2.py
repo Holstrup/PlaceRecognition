@@ -20,6 +20,7 @@ import math
 import csv
 import random
 
+from cirtorch.layers.functional import contrastive_loss
 from cirtorch.datasets.genericdataset import ImagesFromList
 from cirtorch.utils.evaluate import compute_map_and_print, mapk, recall
 from cirtorch.networks.imageretrievalnet import init_network, extract_vectors
@@ -198,8 +199,7 @@ def distances(x, label, gps, eps=1e-6):
     nq = torch.sum(label == -1)  # number of tuples
     S = x.size(1) // nq  # number of images per tuple including query: 1+1+n
 
-    x1 = x[:, ::S].permute(1, 0).repeat(
-        1, S-1).view((S-1)*nq, dim).permute(1, 0)
+    x1 = x[:, ::S].permute(1, 0).repeat(1, S-1).view((S-1)*nq, dim).permute(1, 0)
     idx = [i for i in range(len(label)) if label[i] != -1]
     x2 = x[:, idx]
     lbl = label[label != -1]
@@ -422,19 +422,21 @@ def validation(val_loader, place_net, correlation_model, criterion, epoch):
     for i, (input, target, gps_info) in enumerate(val_loader):       
         nq = len(input) # number of training tuples
         ni = len(input[0]) # number of images per tuple
-
+        print(nq, ni)
+        output = torch.zeros(OUTPUT_DIM, nq*ni).cuda() 
         for q in range(nq):
-            output = torch.zeros(OUTPUT_DIM, ni).cuda()
             forward_pass_time = time.time()
             for imi in range(ni):
                 # compute output vector for image imi
                 #x = correlation_model(place_net(input[q][imi].cuda()).squeeze())
                 #output[:, imi] = x / torch.norm(x) #LF.l2n(correlation_model(place_model(input[q][imi].cuda()).squeeze()))
-                output[:, imi] = correlation_model(place_net(input[q][imi].cuda()).squeeze())
+                output[:, q*ni + imi] = place_net(input[q][imi].cuda()).squeeze() # correlation_model(place_net(input[q][imi].cuda()).squeeze())
             acc_forward_pass_time += time.time() - forward_pass_time
 
             gps_out = torch.tensor(gps_info[q])
-            loss = criterion(output, target[q].cuda(), gps_out)
+            loss = contrastive_loss(output, torch.cat(target).cuda())
+            #loss = criterion(output, torch.cat(target).cuda(), gps_out.cuda())
+            #loss = criterion(output, target[q].cuda(), gps_out)
             epoch_loss += loss
 
     tensorboard.add_scalar('Loss/validation', epoch_loss, epoch)
@@ -489,7 +491,7 @@ def test(place_net, correlation_model):
 
     # evaluate on test datasets
     datasets = ['mapillary'] #args.test_datasets.split(',')
-    for dataset in datasets: 
+    for dataset in datasets:
         start = time.time()
 
         print('>> {}: Extracting...'.format(dataset))
@@ -519,8 +521,9 @@ def test(place_net, correlation_model):
         scores, ranks = torch.sort(scores, dim=0, descending=True) #Dim1? 
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
-
-        scores = scores.cpu().numpy()
+        
+        scores = scores.detach().cpu()
+        scores = scores.numpy()
         scores = np.transpose(scores)
 
         print('>> {}: Computing Recall and Map'.format(dataset))
@@ -565,7 +568,6 @@ def main():
         negDistThr=negDistThr, 
         root_dir = 'data',
         tuple_mining='default',
-        ###cities='debug'
     )
     
     val_dataset = TuplesDataset(
@@ -579,7 +581,7 @@ def main():
             posDistThr=posDistThr, # Use 25 meters for both pos and neg
             negDistThr=negDistThr,
             root_dir = 'data',
-            tuple_mining='default'
+            tuple_mining='default',
     )
     
 
@@ -619,7 +621,7 @@ def main():
     for epoch in range(EPOCH):
         epoch_start_time = time.time()
         print(f'====> {epoch}/{EPOCH}')
-
+        #validation(val_loader, place_net, net, criterion, epoch) #TODO: Remove
         train(train_loader, place_net, net, criterion, optimizer, scheduler, epoch)
         tensorboard.add_scalar('Timing/train_epoch', time.time() - epoch_start_time, epoch)
 
@@ -628,7 +630,9 @@ def main():
             with torch.no_grad():
                 validation(val_loader, place_net, net, criterion, epoch)
                 test_correlation(net, criterion, epoch)
-                test(place_net, net)
+                mAP, rec = test(place_net, net)
+                tensorboard.add_scalar('Test/mAP', mAP, epoch)
+                tensorboard.add_scalar('Test/Recall', rec, epoch)
                 tensorboard.add_scalar('Timing/test_epoch', time.time() - epoch_start_time, epoch)
             
             if args.name != 'debug':
