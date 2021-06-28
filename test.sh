@@ -27,11 +27,12 @@
 # -- end of LSF options --
 ### Load modules 
 echo "Started"
+export PYTHONPATH="${PYTHONPATH}:/zhome/5d/1/117324/Documents/PlaceRecognition"
 module unload cuda
 module unload cudann
 module load cuda/9.0
 module load cudnn/v7.0.5-prod-cuda-9.0
-module load python3/3.7.5a
+module load python3/3.7.5
 echo "Loaded Modules"
 ### Create a virtual environment for Python3
 ### python3 -m venv hello_hpc
@@ -42,5 +43,12 @@ source ~/hello_hpc/bin/activate
 ### echo $PWD
 ### pip3 install -r requirements.txt
 echo "Starting Training"
-python3 -m cirtorch.examples.test_mapillary --network-path 'data/references/MSLS_resnet50_GeM_480_CL.pth' --datasets 'mapillary'
+##python3 cirtorch/examples/test_mapillary.py --datasets 'mapillary' --network-path data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar
+
+###python3 cirtorch/examples/test_mapillary.py --datasets 'mapillary' --network-path data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar --whitening-network data/localnet_exp/contrastive_loss_fulldataset_lr0.0001/model_epoch_150.pth --whitening-outdim 2048
+python3 cirtorch/examples/test_mapillary.py --datasets 'mapillary' --network-path data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar --whitening-network data/localnet_exp/contrastive_loss_fulldataset_lr0.0001/model_epoch_140.pth --whitening-outdim 2048
+###python3 cirtorch/examples/extract_tuples.py --datasets 'mapillary' --network-path data/exp_outputs1/mapillary_resnet50_gem_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum5_qsize2000_psize20000_bsize5_uevery5_imsize1024/model_epoch480.pth.tar --whitening-network data/localnet_exp/contrastive_loss_fulldataset_lr0.0001/model_epoch_160.pth --whitening-outdim 2048
+###python3 cirtorch/examples/extract_tuples.py --datasets 'mapillary' --network-path data/outputs/mapillary_resnet50_gem_whiten_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum6_qsize2000_psize20000_bsize5_uevery5_imsize320/model_epoch180.pth.tar
+###python3 cirtorch/examples/test_mapillary.py --datasets 'mapillary' --network-path data/outputs/mapillary_resnet501024_gem_whiten_contrastive_m0.70_adam_lr1.0e-06_wd1.0e-06_nnum6_qsize2000_psize20000_bsize5_uevery5_imsize320/model_epoch180.pth.tar
+###python3 -m cirtorch.examples.test_mapillary --network-path 'data/references/MSLS_resnet50_GeM_480_CL.pth' --datasets 'mapillary'
 echo "Finished Training"

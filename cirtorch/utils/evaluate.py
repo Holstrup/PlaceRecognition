@@ -173,6 +173,8 @@ def recall(ranks, pidx, ks):
 	return recall_at_k
 
 def apk(pidx, rank, k):
+    if len(pidx) == 0:
+        return np.nan
     if len(rank)>k:
         rank = rank[:k]
 
@@ -187,4 +189,4 @@ def apk(pidx, rank, k):
     return score / min(len(pidx), k)
 
 def mapk(ranks, pidxs, k):
-    return np.mean([apk(a,p,k) for a,p in zip(pidxs, ranks)])
+    return np.nanmean([apk(a,p,k) for a,p in zip(pidxs, ranks)])

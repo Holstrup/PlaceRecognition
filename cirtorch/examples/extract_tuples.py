@@ -21,7 +21,7 @@ from cirtorch.utils.download import download_train, download_test
 from cirtorch.utils.whiten import whitenlearn, whitenapply
 from cirtorch.utils.evaluate import mapk, recall
 from cirtorch.utils.general import get_data_root, htime
-from cirtorch.networks.localcorrelationnet import CorrelationNet
+from cirtorch.networks.localcorrelationnetv2 import CorrelationNet
 
 PRETRAINED = {
     'retrievalSfM120k-vgg16-gem'        : 'http://cmp.felk.cvut.cz/cnnimageretrieval/data/networks/retrieval-SfM-120k/retrievalSfM120k-vgg16-gem-b4dcdc6.pth',
@@ -249,17 +249,31 @@ def main():
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
 
-        scores = scores.cpu().numpy()
+        scores = scores.detach()
+        scores = scores.cpu().numpy() 
         scores = np.transpose(scores)
 
         print('>> {}: Computing Recall and Map'.format(dataset))
         k = 5
         ks = [1, 5, 10]
 
-        print(ranks.size)
-        N, D = ranks.size
-        q = random.randint(0, N - 1)
-        print(ranks[q, :], pidxs[q])
+        N, D = ranks.shape
+        #tuples = [173, 143, 159, 166, 158]
+        for i in range(5): 
+            q = 26 #random.randint(0, N - 1)
+            print('No:', q, N, D)
+        #print(ranks[q, :][0:5], pidxs[q])
+        #print(test_dataset.qImages[q])
+        #print([test_dataset.dbImages[test_dataset.pidxs[q][0:3]]])
+            print(test_dataset.qImages[test_dataset.qpool[q]])
+            ps = ranks[q, :][0:5]
+            print(pidxs[q])
+            print(ps)
+            print([test_dataset.dbImages[p] for p in ps])
+            print('\n')
+        #print([test_dataset.dbImages[i] for i in ranks[q, :][0:5]])
+        #print(test_dataset.ppool[q])
+        #print([test_dataset.dbImages[i] for i in test_dataset.ppool[q]])
         mean_ap = mapk(ranks, pidxs, k)
         rec = recall(ranks, pidxs, ks)
         

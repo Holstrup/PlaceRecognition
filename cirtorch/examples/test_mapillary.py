@@ -20,7 +20,7 @@ from cirtorch.utils.download import download_train, download_test
 from cirtorch.utils.whiten import whitenlearn, whitenapply
 from cirtorch.utils.evaluate import mapk, recall
 from cirtorch.utils.general import get_data_root, htime
-from cirtorch.networks.localcorrelationnet import CorrelationNet
+from cirtorch.networks.localcorrelationnetv2 import CorrelationNet
 
 PRETRAINED = {
     'retrievalSfM120k-vgg16-gem'        : 'http://cmp.felk.cvut.cz/cnnimageretrieval/data/networks/retrieval-SfM-120k/retrievalSfM120k-vgg16-gem-b4dcdc6.pth',
@@ -189,7 +189,11 @@ def main():
         negDistThr=negDistThr,
     )
     qidxs, pidxs = test_dataset.get_loaders()
-
+    print('1', len(qidxs))
+    #test_dataset.filter_positive_loader()
+    #print('2', len(qidxs))
+    #qidxs, pidxs = test_dataset.get_loaders()
+    #print('3', len(qidxs))
     opt = {'batch_size': 1, 'shuffle': False, 'num_workers': 8, 'pin_memory': True}
 
     # evaluate on test datasets
@@ -207,7 +211,7 @@ def main():
         poolvecs = torch.zeros(OUTPUT_DIM, len(test_dataset.dbImages)).cuda()
         for i, input in enumerate(dbLoader):
             if args.whitening_network:
-                qvecs[:, i] = whitening_net(net(input.cuda()).data.squeeze())
+                poolvecs[:, i] = whitening_net(net(input.cuda()).data.squeeze())
             else:
                 poolvecs[:, i] = net(input.cuda()).data.squeeze()
 
@@ -247,7 +251,9 @@ def main():
         ranks = ranks.cpu().numpy()
         ranks = np.transpose(ranks)
 
-        scores = scores.cpu().numpy()
+        
+        scores = scores.detach().cpu().numpy()
+        #scores = scores.cpu().numpy()
         scores = np.transpose(scores)
 
         if args.generate_plot:

@@ -40,15 +40,18 @@ echo "Loaded Modules"
 source ~/hello_hpc/bin/activate
 ### pip3 install -r requirements.txt
 echo "Starting Training"
-python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'IoUWeightedGeneralizedMSEForReal' --neg-num 6 --tuple-mining 'gps' --posDistThr 10 --negDistThr 10
-###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'contrastive' --loss-margin 0.7 --neg-num 6 --posDistThr 10 --negDistThr 10 --tuple-mining 'gps'
+###python3 cirtorch/networks/localcorrelationnetv2.py --loss 'contrastive' --lr 0.0001 --name 'contrastive_loss_fulldataset_lr0.0001'
+python3 cirtorch/networks/localcorrelationnetv2.py --loss 'contrastive_loss' --lr 0.00001 --name 'contrastive_loss_fulldataset_lr0.0001'
+###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'IoUWeightedGeneralizedMSELoss' --neg-num 6 --tuple-mining 'default' --posDistThr 10 --negDistThr 10 --resume --not-pretrained
+###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'IoUWeightedGeneralizedMSEForReal' --neg-num 6 --tuple-mining 'default' --posDistThr 10 --negDistThr 10 --not-pretrained
+###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'contrastive' --loss-margin 0.7 --neg-num 6 --posDistThr 15 --negDistThr 25 --tuple-mining 'default' --resume 'model_epoch180.pth.tar' --whitening
 ###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'triplet' --loss-margin 0.1 --neg-num 5 --tuple-mining 'semihard'
 ###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'IoUWeightedGeneralizedMSELoss' --neg-num 6 --tuple-mining 'gps' --posDistThr 10 --negDistThr 10
-###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'IoUWeightedGeneralizedMSELoss' --neg-num 6 --tuple-mining 'default' --posDistThr 10 --negDistThr 10 --resume 'model_epoch180.pth.tar'
 
 ###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'WeightedGeneralizedContrastiveLoss' --neg-num 6 --tuple-mining 'gps' --posDistThr 10 --negDistThr 10 --resume 'model_epoch260.pth.tar'
 ###python3 -m cirtorch.examples.train data/outputs --training-dataset 'mapillary' --arch 'resnet50' --loss 'WeightedGeneralizedMSELoss' --neg-num 6 --tuple-mining 'gps' --posDistThr 10 --negDistThr 10 --resume 'model_epoch260.pth.tar'
 ### python3 cirtorch/networks/localcorrelationnet.py
 ###python3 cirtorch/networks/correlationnet.py
-#python3 cirtorch/networks/localcorrelationnet.py
+###python3 cirtorch/networks/localcorrelationnet.py --loss 'logistic' --lr 0.0006 --name 'logistic_loss_lr0.0006'
+###python3 cirtorch/networks/localcorrelationnet.py --loss 'logistic'
 echo "Finished Training"

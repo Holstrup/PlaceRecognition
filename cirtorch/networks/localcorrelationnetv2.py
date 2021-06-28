@@ -175,7 +175,7 @@ class CorrelationNet(torch.nn.Module):
         #x = F.leaky_relu(self.hidden2(x))
         #x = self.hidden2o(x)
         x = self.output(x)
-        x = x / (torch.norm(x, p=2, dim=1, keepdim=True) + 1e-6).expand_as(x) # L2 Norm
+        x = x / (torch.norm(x, p=2, dim=0, keepdim=True) + 1e-6).expand_as(x) # L2 Norm
         #x = self.softmax(x)
         return x
 
@@ -223,7 +223,8 @@ def mse_loss(x, label, gps, eps=1e-6, margin=0.7):
     D = D.cuda()
     gps = gps.cuda()
 
-    y = (1-gps)*torch.pow((D - gps), 2) + 0.5*gps*torch.pow(torch.clamp(margin-D, min=0),2)
+    #y = (1-gps)*torch.pow((D - gps), 2) + 0.5*gps*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((D - gps), 2) + (1-lbl)*0.5*torch.pow(torch.clamp(margin-D, min=0),2)
     y = torch.sum(y)
     return y
 
@@ -398,7 +399,7 @@ def train(train_loader, place_net, correlation_model, criterion, optimizer, sche
                 output[:, imi] = correlation_model(place_net(input[q][imi].cuda()).squeeze())
             acc_forward_pass_time += time.time() - forward_pass_time
 
-            gps_out = torch.tensor(gps_info[q])
+            gps_out = 1 - torch.tensor(gps_info[q])
             loss = criterion(output, target[q].cuda(), gps_out)
             loss.backward()
             epoch_loss += loss
@@ -619,7 +620,6 @@ def main():
     for epoch in range(EPOCH):
         epoch_start_time = time.time()
         print(f'====> {epoch}/{EPOCH}')
-        #validation(val_loader, place_net, net, criterion, epoch) #TODO: Remove
         train(train_loader, place_net, net, criterion, optimizer, scheduler, epoch)
         tensorboard.add_scalar('Timing/train_epoch', time.time() - epoch_start_time, epoch)
 

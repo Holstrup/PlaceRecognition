@@ -348,7 +348,7 @@ class TuplesDataset(data.Dataset):
         idxs2qpool = torch.randperm(len(self.qpool))
         self.qidxs = [self.qpool[i] for i in range(len(self.qpool))]
         self.pidxs = [self.ppool[i] for i in range(len(self.ppool))]
-        self.filter_positive_loader()
+        #self.filter_positive_loader()
         return self.qidxs, self.pidxs
     
     def filter_positive_loader(self):
@@ -363,10 +363,6 @@ class TuplesDataset(data.Dataset):
                 iou_dist = self.ioudistance(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid))
                 if iou_dist >= 0.5: #>= 0.5
                     true_positives.append(self.pidxs[i][j])
-                if (iou_dist > 0.5):
-                    print(qid, pid)
-                    print(self.qImages[self.qidxs[i]], self.dbImages[self.pidxs[i][j]])
-                    print(self.getGpsAndAngle(qid), self.getGpsAndAngle(pid), iou_dist, '\n')
             before += len(self.pidxs[i]) 
             self.pidxs[i] = true_positives
             after +=len(self.pidxs[i])
@@ -578,7 +574,7 @@ class TuplesDataset(data.Dataset):
         if self.tuple_mining == 'default':
             return self.epoch_tuples_standard(net)
         elif self.tuple_mining == 'whitening':
-            return epoch_tuples_whitening_network(net, whitening_net)
+            return self.epoch_tuples_whitening_network(net, whitening_net)
         elif self.tuple_mining == 'semihard':
             return self.epoch_tuples_semihard(net)
         else:
