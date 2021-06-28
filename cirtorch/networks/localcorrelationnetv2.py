@@ -44,6 +44,8 @@ OUTPUT_DIM = 2048
 
 LR = 0.0006  # TODO: Lower Learning Rate
 WD = 4e-3
+MSE_SCALINGFACTOR = 1.0
+L = 2
 
 FULL_DATASET = False
 dataset_path = 'data/dataset'
@@ -67,6 +69,8 @@ parser = argparse.ArgumentParser(description='PyTorch CNN Image Retrieval Traini
 parser.add_argument('--name', default='debug', type=str, metavar='N')
 parser.add_argument('--loss', default='mse_loss', type=str, metavar='N')
 parser.add_argument('--lr', default=0.0006, type=float, metavar='lr')  
+parser.add_argument('--mse-scaling', default=1.0, type=float, metavar='mse')  
+parser.add_argument('--l', default=2, type=int, metavar='l')  
 
 """
 Dataset
@@ -218,13 +222,21 @@ def contrastive(x, label, gps, eps=1e-6, margin=0.7):
     y = torch.sum(y)
     return y
 
-def mse_loss(x, label, gps, eps=1e-6, margin=0.7):
+def generalized_contrastive(x, label, gps, eps=1e-6, margin=0.7):
+    dist, D, lbl = distances(x, label, gps, eps=1e-6)
+    D = D.cuda() 
+    overlap_inv = gps.cuda()
+    
+    y = (1-overlap_inv)*torch.pow(D, 2) + 0.5*overlap_inv*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = torch.sum(y)
+    return y
+
+def mse_loss(x, label, gps, eps=1e-6, margin=0.7, scaling_factor=MSE_SCALINGFACTOR, Lint=L):
     dist, D, lbl = distances(x, label, gps, eps=1e-6)
     D = D.cuda()
-    gps = gps.cuda()
+    overlap_inv = gps.cuda() # 1 - Overlap (High overlap -> 0, Low overlap -> 1)
 
-    #y = (1-gps)*torch.pow((D - gps), 2) + 0.5*gps*torch.pow(torch.clamp(margin-D, min=0),2)
-    y = lbl*torch.pow((D - gps), 2) + (1-lbl)*0.5*torch.pow(torch.clamp(margin-D, min=0),2)
+    y = lbl*torch.pow((D - overlap_inv * scaling_factor), Lint) + (1-lbl)*0.5*torch.pow(torch.clamp(margin-D, min=0), Lint)
     y = torch.sum(y)
     return y
 
@@ -611,6 +623,8 @@ def main():
         criterion = contrastive
 
     LR = float(args.lr)
+    MSE_SCALINGFACTOR = float(args.mse_scaling)
+    L = int(args.l)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=LR, weight_decay=WD)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=math.exp(-0.01))
