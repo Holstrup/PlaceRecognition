@@ -11,14 +11,22 @@ import pandas as pd
 
 #db_postproc = pd.read_csv(f'/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch/notebooks/data/IT5/MSEAndContrastive400/Train/Images/{city}/database/postprocessed.csv')
 #db_raw = pd.read_csv(f'/Users/alexanderholstrup/git/VisualPlaceRecognition/cnnimageretrieval-pytorch/notebooks/data/IT5/MSEAndContrastive400/Train/Images/{city}/database/raw.csv')
-
+"""
+q_postproc = pd.read_csv(f'/Users/alexanderholstrup/Desktop/miami/query/postprocessed.csv')
+q_raw = pd.read_csv(f'/Users/alexanderholstrup/Desktop/miami/query/raw.csv')
+db_postproc = pd.read_csv(f'/Users/alexanderholstrup/Desktop/miami/database/postprocessed.csv')
+db_raw = pd.read_csv(f'/Users/alexanderholstrup/Desktop/miami/database/raw.csv')
+"""
+q_postproc = pd.read_csv(f'/Users/alexanderholstrup/Desktop/buenos/query/postprocessed.csv')
+q_raw = pd.read_csv(f'/Users/alexanderholstrup/Desktop/buenos/query/raw.csv')
+db_postproc = pd.read_csv(f'/Users/alexanderholstrup/Desktop/buenos/database/postprocessed.csv')
+db_raw = pd.read_csv(f'/Users/alexanderholstrup/Desktop/buenos/database/raw.csv')
 
 # view_distance: How far out can we look?
 VIEW_DISTANCE = 50   #Meters 
 
 # view_angle: what is our field of view?
-VIEW_ANGLE = math.pi / 2 #math.pi / 4 + math.pi / 8 #+ math.pi / 16 #math.pi / 2
-
+VIEW_ANGLE = math.pi / 2 #2 * math.pi / 3
 
 def to_radians(angle):
     cartesian_angle = (450 - angle) % 360
@@ -32,21 +40,21 @@ def calc_next_point(x, y, angle, view_distance=VIEW_DISTANCE):
 
 def iou(polygon1, polygon2):
     intersection = polygon1.intersection(polygon2)
-    return intersection.area / (polygon1.area + polygon2.area - intersection.area)
+    return intersection.area / polygon1.area
 
 def ious(query_polygon, db_polygon):
     return [iou(query_polygon,polygon) for polygon in db_polygon]
 
-def field_of_view(points, approximation=10, convert_to_radians=True):
+def field_of_view(points, approximation=10, convert_to_radians=True, view_angle=VIEW_ANGLE, view_distance=VIEW_DISTANCE):
     polygons = []
     for point in points:
         northing, easting, angle = point
         if convert_to_radians:
             angle = to_radians(angle)
-        starting_angle, end_angle = calc_angles(angle)
+        starting_angle, end_angle = calc_angles(angle, view_angle)
         points = [[northing, easting]]
 
-        points.extend(calc_next_point(northing, easting, np.linspace(starting_angle, end_angle, approximation)))
+        points.extend(calc_next_point(northing, easting, np.linspace(starting_angle, end_angle, approximation), view_distance))
         
         polygons.append(Polygon(points))
     return polygons
@@ -72,7 +80,7 @@ def get_coordinate(key, postproc, raw):
     northing, easting = df['northing'].iloc[0], df['easting'].iloc[0]
     df = raw.loc[raw['key'] == key]
     ca = df['ca'].iloc[0]
-    print(df['lat'].iloc[0], ',',df['lon'].iloc[0])
+    #print(df['lat'].iloc[0], ',',df['lon'].iloc[0])
     return [easting, northing, to_radians(ca)]
 
 def get_coordinates(keys):
@@ -81,16 +89,60 @@ def get_coordinates(keys):
         points.append(get_coordinate(key, db_postproc, db_raw))
     return points
 
-#keys = ['0NvpSEDZd8Ll_N6YDaf8dA' ,'EvWyELiNjmcgPV5Mu6P8ew','LgZgiqaR-Vm4n8Ly8RtI-A','kvRQa8GKJtt73uwhBGNxSw','_rOfyHfpkLW39p1uREzQmA','94GS7xEn7ySg7yLdlVfkKw','Rjptg8UTfmJkIiJjPy-I5w', 'BqBF-96_NViSVwSjc5WeBQ']
-#keys = ['KsiCcR_YbcQnNAsKafSOng', 'tFmc-wK7A0eigPf9KhLHVQ', 'g7wfAspdwkiDfvknUdkZgg', 'pAG4DSoggEl5WVYUWjAEIA', 'l40wawAhi2TL-CZuzfrYig'] #1631
-#keys = ['MRfIz0MpoUP5LApkt5GwhA', 'TK6RLS3e8Oa7wqciYC75Ow', 'Tjsn1erZ7GdbeAJAZfDYDA', 'tqin7Zzu0dCGFZmrzhQCCw', 'BaaM4Qvf3VMvjiG1apeFWQ'] #3700
-#keys = ['DDb7lapO-czjhb6o_J1MxA', 'zFzarHuCvI73RJf_7MlkLQ', 'VrJfd57eglX5LskATygIiQ', 'XF9EaQsEE5V3WyO9sNu-6A', 'KiFXKBjFgBIOondz8Rm2Cg'] #3220
-#keys = ['6jOFome0L5-qRaYGQW1doA', 'VrJfd57eglX5LskATygIiQ', 'KiFXKBjFgBIOondz8Rm2Cg', 'zFzarHuCvI73RJf_7MlkLQ', 'AchY4D1tRFwQLT2Bawoc0Q', 'XF9EaQsEE5V3WyO9sNu-6A']
+def distance(query, positive):
+    return np.linalg.norm(np.array(query) - np.array(positive))
 
-#keys = ['y2xotXR_HrbadIxXk24EkQ', 'u894ydL4oc7a4aLUwk9rwg', 'D6dYsU5W2JZfyMRdH-MZng', 'M06sx0JtP7X5MiPGzBh4yg', 'q9_ykmaKaJDYwKG0B_8CBg', 'E0tp9rcW0ooVyYoyobKvTg', 'f9ng8k9Ngt4UWja_a-mjaw', 'CxYjkOBcps80szVVKzfe5A']
+def get_distances(keys):
+    dis = []
+    qpoint = get_coordinate(keys[0], q_postproc, q_raw)[0:2]
+    for key in keys[1:]:
+        point = get_coordinate(key, db_postproc, db_raw)[0:2]
+        dis.append(distance(qpoint, point))
+    return dis
 
 
-#points = get_coordinates(keys)
-#pol = field_of_view(points)
-#print(ious(pol[0], pol[1:]))
-#plot_fov(pol)
+"""
+#points = [[0,0,0], [0,0,40]]
+#points = [[0,0,0], [25,0,0]]
+
+#keys = ['9X43HXskdI-kJnt4CRMY0Q', 'QfRBMkBuwFCfE28L8xaa8A', 'ZJWzYIRyhmOVBi5v-T7Prw', 'VoXJWp_wtYJ5oTJZ32cCkg', 'GCnrKGs0uLLKDcezDWHd8A', 'XpEitw6dn3ocrCdHaRq35g']
+#keys = ['9X43HXskdI-kJnt4CRMY0Q', 'QfRBMkBuwFCfE28L8xaa8A', 'ZJWzYIRyhmOVBi5v-T7Prw', 'VoXJWp_wtYJ5oTJZ32cCkg', 'GCnrKGs0uLLKDcezDWHd8A', 'XpEitw6dn3ocrCdHaRq35g']
+
+#keys = ['olucTfqJt_xMiwr9Eavimg', 'W9Vn-RC_OVPWWxI3Ug63eQ', 'GyIekSEM2Tevd9LX68-wFw', 'cJbU-IH3TbMLIH4yUqQudg', 'bEnnHogqXExPfH9Y5h3ojg', 'jlWWKhZ2SC1LBOt4OVV3cA']
+
+#keys = ['pIaUxMrK2pAF-UG807_SyA', 'PBp7NDYX0oc9VeiMouuybw', '1bWZC2-ORUDJEsMJWgeybA', 'SFn27bl67Evgw0ni1Qgzwg', 'gwfP-H9an_huFicbG0mCyw', '7VeeN10hJeFupkmNd9Qwcw']
+keys = ['pIaUxMrK2pAF-UG807_SyA', '1bWZC2-ORUDJEsMJWgeybA', 'PBp7NDYX0oc9VeiMouuybw', 'r9fhP-Su_TRmn6ZjCYYpqg', 'xmvabOMcoGUB3E2bWmwmvQ', 'iWO4Mh7duE7Tyqe6YEUoSg']
+#keys = ['pIaUxMrK2pAF-UG807_SyA', '1bWZC2-ORUDJEsMJWgeybA', 'PBp7NDYX0oc9VeiMouuybw', 'SFn27bl67Evgw0ni1Qgzwg', '7VeeN10hJeFupkmNd9Qwcw', '8cKYY6CDij_o74J4-CR4Vw']
+
+#keys = ['z1Tm6jrIkhE4jUSm14rYt8', 'SbAUjyJNMs1mPJXMQJGXOf', 'cdmsgSBuXbPGSnF9S2EevZ', 'um2egmv2F2n9lPobP5vUBj', 'LRVsecPCzqK_npV0aE21ok', 'PqyDOMPbhBuvd-_UuSz8oM']
+#keys = ['z1Tm6jrIkhE4jUSm14rYt8', 'ZWuMn4X03a8LgQqC98v5kb', 'LRVsecPCzqK_npV0aE21ok', 'cdmsgSBuXbPGSnF9S2EevZ', 'cvb6uFIfqLMAO0baOoRLB3', 'bvqy0Sfjbf5awBwMFe_-R3']
+#keys = ['z1Tm6jrIkhE4jUSm14rYt8', 'ZWuMn4X03a8LgQqC98v5kb', 'LRVsecPCzqK_npV0aE21ok', 'cdmsgSBuXbPGSnF9S2EevZ', 'cvb6uFIfqLMAO0baOoRLB3', 'um2egmv2F2n9lPobP5vUBj']
+
+
+points = get_coordinates(keys)
+VIEW_ANGLE = to_radians(90)
+pol = field_of_view(points, convert_to_radians=False)
+print('IOUS: ', ious(pol[0], pol[1:]))
+print('GPS: ', get_distances(keys))
+
+plt.scatter(get_distances(keys), ious(pol[0], pol[1:]))
+plt.xlim((0, 25))
+plt.ylim((0, 1))
+plt.show()
+plot_fov(pol)
+
+
+iou_scores = []
+#points = [[0,0,0], [0,0,40]]
+points = [[0,0,0], [25,0,0]]
+angles = np.linspace(0.01, 2*math.pi, num=100)
+#distances = np.linspace(1, 100, num=100)
+for i in range(len(angles)):
+    VIEW_ANGLE = angles[i]
+    #VIEW_DISTANCE = distances[i]
+    pol = field_of_view(points, convert_to_radians=True, view_angle=VIEW_ANGLE, view_distance=VIEW_DISTANCE)
+    iou_scores.append(ious(pol[0], pol[1:])[0])
+plt.scatter(angles, iou_scores)
+plt.ylim((0, 1))
+plt.show()
+"""
