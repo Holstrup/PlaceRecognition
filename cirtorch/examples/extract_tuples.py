@@ -22,6 +22,7 @@ from cirtorch.utils.whiten import whitenlearn, whitenapply
 from cirtorch.utils.evaluate import mapk, recall
 from cirtorch.utils.general import get_data_root, htime
 from cirtorch.networks.localcorrelationnetv2 import CorrelationNet
+from cirtorch.utils.view_angle import field_of_view, ious
 
 PRETRAINED = {
     'retrievalSfM120k-vgg16-gem'        : 'http://cmp.felk.cvut.cz/cnnimageretrieval/data/networks/retrieval-SfM-120k/retrievalSfM120k-vgg16-gem-b4dcdc6.pth',
@@ -281,6 +282,17 @@ def main():
         print('>> mAP 5: {}'.format(mean_ap))
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
+        summed_ious = 0
+        for i in qidxs:
+            ps = ranks[q, :][0:k]
+
+            q_key = test_dataset.qImages[test_dataset.qpool[q]][-26:-4]
+            p_keys = [test_dataset.dbImages[p][-26:-4] for p in ps]
+            points = [test_dataset.getGpsAndAngle(q_key)] + [test_dataset.getGpsAndAngle(p_key) for p_key in p_keys]
+            polygons = field_of_view(points)
+            print(ious(polygons))
+            summed_ious += np.sum(ious(polygons))
+            
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
 
