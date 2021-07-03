@@ -283,21 +283,21 @@ def main():
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
         summed_ious = []
-        k = 50
-        for q in range(len(qidxs)):
-            ps = ranks[q, :][0:k]
+        ks = [10, 25, 50]
+        for k in ks:
+            for q in range(len(qidxs)):
+                ps = ranks[q, :][0:k]
 
-            q_key = test_dataset.qImages[test_dataset.qpool[q]][-26:-4]
-            p_keys = [test_dataset.dbImages[p][-26:-4] for p in ps]
-            points = [test_dataset.getGpsAndAngle(q_key)] + [test_dataset.getGpsAndAngle(p_key) for p_key in p_keys]
-            polygons = field_of_view(points)
-            closest_scores = 1 - np.array(ious(polygons[0], polygons[1:]))
-            #print(closest_scores, np.corrcoef(np.array([1,2,3,4,5]), closest_scores)[0,1])
-            #print(closest_scores, closest_scores[closest_scores != 0.0])
-            summed_ious.append(np.corrcoef(np.linspace(1,k,k), closest_scores)[0,1])
-            #summed_ious.append(np.mean(closest_scores[closest_scores != 0.0]))
-        print(summed_ious)
-        print(np.nanmean(summed_ious))
+                q_key = test_dataset.qImages[test_dataset.qpool[q]][-26:-4]
+                p_keys = [test_dataset.dbImages[p][-26:-4] for p in ps]
+                points = [test_dataset.getGpsAndAngle(q_key)] + [test_dataset.getGpsAndAngle(p_key) for p_key in p_keys]
+                polygons = field_of_view(points)
+                closest_scores = np.array(ious(polygons[0], polygons[1:]))
+
+                summed_ious.append(np.corrcoef(np.linspace(1,k,k), 1 - closest_scores)[0,1]) # Pearson
+                #summed_ious.append(np.mean(closest_scores[closest_scores != 0.0])) #mAOverlap
+            #print(summed_ious)
+            print(f'{k} : {np.nanmean(summed_ious)}')
             
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
