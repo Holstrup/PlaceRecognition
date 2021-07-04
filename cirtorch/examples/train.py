@@ -94,8 +94,6 @@ parser.add_argument('--loss', '-l', metavar='LOSS', default='LinearWeightedContr
                         ' (default: LinearWeightedContrastive)')
 parser.add_argument('--loss-margin', '-lm', metavar='LM', default=0.7, type=float,
                     help='loss margin: (default: 0.7)')
-parser.add_argument('--train-end-to-end', '-e2e', default=True, type=bool,
-                    help='Train all parameters: (default: true)')
 
 # train/val options specific for image retrieval learning
 parser.add_argument('--image-size', default=320, type=int, metavar='N',
@@ -241,28 +239,27 @@ def main():
     # parameters split into features, pool, whitening 
     # IMPORTANT: no weight decay for pooling parameter p in GeM or regional-GeM
     parameters = []
-    if args.train_end_to_end:
-        # add feature parameters
-        parameters.append({'params': model.features.parameters()})
-        # add local whitening if exists
-        if model.lwhiten is not None:
-            parameters.append({'params': model.lwhiten.parameters()})
-        # add pooling parameters (or regional whitening which is part of the pooling layer!)
-        if not args.regional:
-            # global, only pooling parameter p weight decay should be 0
-            if args.pool == 'gem':
-                parameters.append({'params': model.pool.parameters(), 'lr': args.lr*10, 'weight_decay': 0})
-            elif args.pool == 'gemmp':
-                parameters.append({'params': model.pool.parameters(), 'lr': args.lr*100, 'weight_decay': 0})
-        else:
-            # regional, pooling parameter p weight decay should be 0,
-            # and we want to add regional whitening if it is there
-            if args.pool == 'gem':
-                parameters.append({'params': model.pool.rpool.parameters(), 'lr': args.lr*10, 'weight_decay': 0})
-            elif args.pool == 'gemmp':
-                parameters.append({'params': model.pool.rpool.parameters(), 'lr': args.lr*100, 'weight_decay': 0})
-            if model.pool.whiten is not None:
-                parameters.append({'params': model.pool.whiten.parameters()})
+    # add feature parameters
+    parameters.append({'params': model.features.parameters()})
+    # add local whitening if exists
+    if model.lwhiten is not None:
+        parameters.append({'params': model.lwhiten.parameters()})
+    # add pooling parameters (or regional whitening which is part of the pooling layer!)
+    if not args.regional:
+        # global, only pooling parameter p weight decay should be 0
+        if args.pool == 'gem':
+            parameters.append({'params': model.pool.parameters(), 'lr': args.lr*10, 'weight_decay': 0})
+        elif args.pool == 'gemmp':
+            parameters.append({'params': model.pool.parameters(), 'lr': args.lr*100, 'weight_decay': 0})
+    else:
+        # regional, pooling parameter p weight decay should be 0,
+        # and we want to add regional whitening if it is there
+        if args.pool == 'gem':
+            parameters.append({'params': model.pool.rpool.parameters(), 'lr': args.lr*10, 'weight_decay': 0})
+        elif args.pool == 'gemmp':
+            parameters.append({'params': model.pool.rpool.parameters(), 'lr': args.lr*100, 'weight_decay': 0})
+        if model.pool.whiten is not None:
+            parameters.append({'params': model.pool.whiten.parameters()})
     # add final whitening if exists
     if model.whiten is not None:
         parameters.append({'params': model.whiten.parameters()})
@@ -300,6 +297,7 @@ def main():
         else:
             print(">> No checkpoint found at '{}'".format(args.resume))
     
+    optimizer.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     # Data loading code
     print('MEAN: ' + str(model.meta['mean']))
     print('STD: ' + str(model.meta['std']))
@@ -492,7 +490,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
                 loss = criterion(output, target[q].cuda(), gps_info[q].cuda())
                 if i % 200 == 0:
                     batchid = 400 * epoch + i 
-                    writer.add_scalar('Embeddings/Weighting', criterion.mse_loss, batchid)
+                    writer.add_scalar('Embeddings/Weighting', criterion.weighting, batchid)
             else:
                 loss = criterion(output, target[q].cuda())
             losses.update(loss.item())
