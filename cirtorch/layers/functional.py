@@ -584,21 +584,13 @@ def generalized_contrastive_mse_loss(x, label, gps, margin=25, eps=1e-6, alpha=3
 
     dif = x1 - x2
     D = torch.pow(dif+eps, 2).sum(dim=0).sqrt()
-    alpha = torch.ones(lbl.size()) * alpha
-    alpha = alpha.cuda()    
-    D = D * alpha 
+    D = D.cuda()
 
-    smoothing = torch.zeros(len(lbl))
-    for i, gps_i in enumerate(gps):
-        smoothing[i] = torch.clamp(1 - gps_i/50, min=0)        
-    smoothing = smoothing.cuda()
-    print(D, gps)
-    y = 0.5*smoothing*torch.pow(D - gps,2) + 0.5*(1-smoothing)*torch.pow(torch.clamp(margin-D, min=0),2)
+    overlap_inv = 1 - gps.cuda() # 1 - Overlap (High overlap -> 0, Low overlap -> 1)
 
-    y /= (alpha**2)
+    y = lbl*torch.pow((D - overlap_inv), 1) + (1-lbl)*0.5*torch.pow(torch.clamp(margin-D, min=0), 1)
     y = torch.sum(y)
-    smoothing_factor = torch.sum(smoothing)
-    return y, smoothing_factor
+    return y, y
 
 def smoothed_mse(x, label, gps, margin=25, eps=1e-6, alpha=35): 
     # Regular contrastive loss scaled up and then down again (sanity check)
