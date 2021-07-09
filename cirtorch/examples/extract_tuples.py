@@ -7,6 +7,7 @@ import random
 
 import numpy as np
 import sklearn
+from scipy import stats
 
 import torch
 from torch.utils.model_zoo import load_url
@@ -259,9 +260,9 @@ def main():
         ks = [1, 5, 10]
 
         N, D = ranks.shape
-        #tuples = [173, 143, 159, 166, 158]
-        for i in range(5): 
-            q = 26 #random.randint(0, N - 1)
+        tuples = [55,39,9,118,21,50,68]
+        for i in range(10): 
+            q = tuples[i] #random.randint(0, N - 1)
             print('No:', q, N, D)
         #print(ranks[q, :][0:5], pidxs[q])
         #print(test_dataset.qImages[q])
@@ -283,7 +284,7 @@ def main():
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
         summed_ious = []
-        ks = [10, 25, 50]
+        ks = [10, 25, 50] #[10, 25, 50]
         for k in ks:
             for q in range(len(qidxs)):
                 ps = ranks[q, :][0:k]
@@ -292,10 +293,25 @@ def main():
                 p_keys = [test_dataset.dbImages[p][-26:-4] for p in ps]
                 points = [test_dataset.getGpsAndAngle(q_key)] + [test_dataset.getGpsAndAngle(p_key) for p_key in p_keys]
                 polygons = field_of_view(points)
-                closest_scores = np.array(ious(polygons[0], polygons[1:]))
+                
+                gps_dist = [test_dataset.distance(test_dataset.getGpsAndAngle(q_key)[0:2], test_dataset.getGpsAndAngle(p_key)[0:2]) for p_key in p_keys]
+                #print(q_key, p_keys, gps_dist)
+                #closest_scores = np.array(gps_dist)
+                #print(closest_scores) 
+                
+                closest_scores = np.array([float(p) for p in ious(polygons[0], polygons[1:])])
 
-                summed_ious.append(np.corrcoef(np.linspace(1,k,k), 1 - closest_scores)[0,1]) # Pearson
-                #summed_ious.append(np.mean(closest_scores[closest_scores != 0.0])) #mAOverlap
+                #print(closest_scores, gps_dist)
+                #summed_ious.append(np.corrcoef(np.linspace(1,k,k), 1 - closest_scores)[0,1]) # Pearson
+                #summed_ious.append(np.mean(closest_scores[closest_scores <= 25.0])) #mAOverlap
+                closest_scores = closest_scores[closest_scores != 0.0]
+                #closest_scores = closest_scores[closest_scores <= 25.0]
+                #print(1 - closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)), tau)
+                #print(closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)))
+                tau, _ = stats.kendalltau(1 - closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)))
+                #tau, _ = stats.kendalltau(closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)))
+                summed_ious.append(tau)
+                #print(closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)), tau)
             #print(summed_ious)
             print(f'{k} : {np.nanmean(summed_ious)}')
             
