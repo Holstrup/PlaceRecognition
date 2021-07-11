@@ -8,6 +8,7 @@ import random
 import numpy as np
 import sklearn
 from scipy import stats
+import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.model_zoo import load_url
@@ -260,9 +261,9 @@ def main():
         ks = [1, 5, 10]
 
         N, D = ranks.shape
-        tuples = [55,39,9,118,21,50,68]
+        #tuples = [55,39,9,118,21,50,68]
         for i in range(10): 
-            q = tuples[i] #random.randint(0, N - 1)
+            q = random.randint(0, N - 1)
             print('No:', q, N, D)
         #print(ranks[q, :][0:5], pidxs[q])
         #print(test_dataset.qImages[q])
@@ -284,10 +285,13 @@ def main():
         print('>> {}: elapsed time: {}'.format(dataset, htime(time.time()-start)))
 
         summed_ious = []
-        ks = [10, 25, 50] #[10, 25, 50]
+        ks = [50] #[10, 25, 50]
+        lat_distances = []
+        fov_distances = []
         for k in ks:
             for q in range(len(qidxs)):
                 ps = ranks[q, :][0:k]
+                lat_dist = scores[q, :][0:k]
 
                 q_key = test_dataset.qImages[test_dataset.qpool[q]][-26:-4]
                 p_keys = [test_dataset.dbImages[p][-26:-4] for p in ps]
@@ -304,7 +308,11 @@ def main():
                 #print(closest_scores, gps_dist)
                 #summed_ious.append(np.corrcoef(np.linspace(1,k,k), 1 - closest_scores)[0,1]) # Pearson
                 #summed_ious.append(np.mean(closest_scores[closest_scores <= 25.0])) #mAOverlap
+                print(len(lat_dist), len(closest_scores))
+                lat_dist = lat_dist[closest_scores != 0.0]
                 closest_scores = closest_scores[closest_scores != 0.0]
+                lat_distances.append(lat_dist)
+                fov_distances.append(closest_scores)
                 #closest_scores = closest_scores[closest_scores <= 25.0]
                 #print(1 - closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)), tau)
                 #print(closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)))
@@ -314,6 +322,8 @@ def main():
                 #print(closest_scores, np.linspace(1,len(closest_scores),len(closest_scores)), tau)
             #print(summed_ious)
             print(f'{k} : {np.nanmean(summed_ious)}')
+        plt.scatter(lat_distances, fov_distances)
+        plt.savefig('correlation_plot.pdf')
             
 def distance(query, positive):
     return np.linalg.norm(np.array(query)-np.array(positive))
